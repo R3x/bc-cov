@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bccov"
+version = "0.0.0"
+dependencies = [
+    "colorlog"
+]
+readme = "README.md"
+description = "bccov - A tool to generate code coverage reports for LLVM Bitcode files"
+authors = [
+    {name = "Siddharth Muralee", email = "smuralee@purdue.edu"}
+]
+license = {file = "LICENSE"}
+keywords = ["static-analysis"]
+requires-python = ">=3"
+
+[project.scripts]
+bccov = "bccov:run_cli"
+
+[project.urls]
+homepage = "https://github.com/R3x/bccov"
+documentation = "https://github.com/R3x/bccov"
+repository = "https://github.com/R3x/bccov"
+
+[tool.setuptools.packages.find]
+include = ["bccov"]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "pre-commit"
+]
+
+[tool.isort]
+profile = "black"
+force_to_top = ["typing"]
+from_first = true
+skip = ["__init__.py"]
