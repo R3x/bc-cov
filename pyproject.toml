@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "bccov"
 version = "0.0.0"
 dependencies = [
-    "colorlog"
+    "colorlog",
+    "pytest"
 ]
 readme = "README.md"
 description = "bccov - A tool to generate code coverage reports for LLVM Bitcode files"
