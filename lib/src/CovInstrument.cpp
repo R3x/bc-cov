@@ -8,7 +8,7 @@
 #include "llvm/Support/AtomicOrdering.h"
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/IR/DebugInfoMetadata.h>
-
+#include <llvm/Support/Debug.h>
 
 using namespace llvm;
 
@@ -21,8 +21,8 @@ namespace
 
     bool runOnModule(Module &M) override
     {
-      LLVMContext &Context = M.getContext();
-      IntegerType *Int64Ty = Type::getInt64Ty(Context);
+      LLVMContext &C = M.getContext();
+      IntegerType *Int64Ty = Type::getInt64Ty(C);
       std::map<std::string, std::vector<Function *>> fileFunctionMap;
 
       for (Function &F : M)
@@ -35,52 +35,61 @@ namespace
         // Create a global array for each function
         unsigned int NumBBs = std::distance(F.begin(), F.end());
         ArrayType *ArrayTy = ArrayType::get(Int64Ty, NumBBs);
-        GlobalVariable *BBCounters = new GlobalVariable(M, ArrayTy, false, GlobalValue::InternalLinkage, Constant::getNullValue(ArrayTy), F.getName() + "_counters");
+        std::string funcName = F.getName().str() + "_counters";
+        llvm::dbgs() << "Creating Function Array: " << funcName << "\n";
+        GlobalVariable *BBCounters = dyn_cast<GlobalVariable>(M.getOrInsertGlobal(funcName, ArrayTy));
+        
+        // new GlobalVariable(M, ArrayTy, false, 
+        //   GlobalValue::InternalLinkage, Constant::getNullValue(ArrayTy), funcName);
 
         // Insert atomic increment operations in each basic block
-        insertAtomicIncrements(F, BBCounters, Int64Ty);
+        insertAtomicIncrements(F, BBCounters);
 
         // Group functions by file name
         if (DISubprogram *SP = F.getSubprogram())
         {
           std::string FileName = SP->getFile()->getFilename().str();
           fileFunctionMap[FileName].push_back(&F);
+        } else {
+          llvm_unreachable("Function does not have a DISubprogram");
         }
       }
 
       // Insert calls to bc_cov_set_file and bc_cov
-      insertbcCovCalls(M, fileFunctionMap, Int64Ty);
+      insertbcCovCalls(M, fileFunctionMap);
 
       return true;
     }
 
-    void insertAtomicIncrements(Function &F, GlobalVariable *BBCounters, IntegerType *Int64Ty)
+    void insertAtomicIncrements(Function &F, GlobalVariable *BBCounters)
     {
       unsigned int BBIndex = 0;
       for (BasicBlock &BB : F)
       {
-        IRBuilder<> Builder(&BB);
+        Instruction *InsI = &(*(BB.getFirstInsertionPt()));
+        IRBuilder<> Builder(InsI);
+        LLVMContext &C = BB.getContext();
 
         // Create an atomic increment for the corresponding counter
-        std::vector<Value *> Indices{ConstantInt::get(Int64Ty, 0), ConstantInt::get(Int64Ty, BBIndex++)};
+        std::vector<Value *> Indices{ConstantInt::get(Type::getInt64Ty(C), 0), ConstantInt::get(Type::getInt64Ty(C), BBIndex++)};
         Value *Ptr = Builder.CreateInBoundsGEP(BBCounters, Indices);
-        LoadInst *LoadedVal = Builder.CreateLoad(Int64Ty, Ptr);
+        LoadInst *LoadedVal = Builder.CreateAlignedLoad(Type::getInt64Ty(C), Ptr, 0);
         LoadedVal->setAtomic(AtomicOrdering::Monotonic);
-        Value *IncVal = Builder.CreateAdd(LoadedVal, ConstantInt::get(Int64Ty, 1));
-        StoreInst *Store = Builder.CreateStore(IncVal, Ptr);
+        Value *IncVal = Builder.CreateAdd(LoadedVal, ConstantInt::get(Type::getInt64Ty(C), 1));
+        StoreInst *Store = Builder.CreateAlignedStore(IncVal, Ptr, 0);
         Store->setAtomic(AtomicOrdering::Monotonic);
       }
     }
 
-    void insertbcCovCalls(Module &M, std::map<std::string, std::vector<Function *>> &fileFunctionMap, IntegerType *Int64Ty)
+    void insertbcCovCalls(Module &M, std::map<std::string, std::vector<Function *>> &fileFunctionMap)
     {
-      LLVMContext &Context = M.getContext();
+      LLVMContext &C = M.getContext();
       // create a new function named _bc_cov_dump 
-      FunctionType *DumpFuncType = FunctionType::get(Type::getVoidTy(Context), false);
-      Function *DumpFunc = Function::Create(DumpFuncType, GlobalValue::ExternalLinkage, "bc_cov_dump", &M);
+      FunctionType *DumpFuncType = FunctionType::get(Type::getVoidTy(C), false);
+      Function *DumpFunc = Function::Create(DumpFuncType, GlobalValue::ExternalLinkage, "_bc_cov_dump", &M);
 
 
-      BasicBlock *BB = BasicBlock::Create(Context, "entry", DumpFunc);
+      BasicBlock *BB = BasicBlock::Create(C, "entry", DumpFunc);
       IRBuilder<> builder(BB);
 
       for (auto &fileFuncPair : fileFunctionMap)
@@ -95,19 +104,22 @@ namespace
         for (Function *F : functions)
         {
           // Get the global counters array for the function
-          GlobalVariable *BBCounters = M.getGlobalVariable((F->getName() + "_counters").str());
+          std::string funcName = F->getName().str() + "_counters";
+          llvm::dbgs() << "Finding array : " << funcName << "\n";
+          GlobalVariable *BBCounters = M.getGlobalVariable(funcName);
           unsigned int NumBBs = std::distance(F->begin(), F->end());
 
           // Insert call to bc_cov
-          insertCovCall(M, *F, BBCounters, NumBBs, Int64Ty, builder);
+          insertCovCall(M, *F, BBCounters, NumBBs, builder);
         }
       }
     }
 
     void insertSetFileCall(Module &M, const std::string &fileName, int numFuncs, IRBuilder<> &Builder)
     {
-      LLVMContext &Context = M.getContext();
-      FunctionType *SetFileType = FunctionType::get(Type::getVoidTy(Context), {Type::getInt8PtrTy(Context), Type::getInt32Ty(Context), Type::getInt32Ty(Context)}, false);
+      LLVMContext &C = M.getContext();
+      FunctionType *SetFileType = FunctionType::get(Type::getVoidTy(C), 
+          {Type::getInt8PtrTy(C), Type::getInt32Ty(C), Type::getInt32Ty(C)}, false);
       FunctionCallee SetFileFunc = M.getOrInsertFunction("bc_cov_set_file", SetFileType);
 
       // Create arguments for the call
@@ -118,27 +130,29 @@ namespace
       Builder.CreateCall(SetFileFunc, {FileNameStr, FileNameLen, NumFuncsVal});
     }
 
-    void insertCovCall(Module &M, Function &F, GlobalVariable *BBCounters, unsigned int NumBBs, IntegerType *Int64Ty, IRBuilder<> &Builder)
+    void insertCovCall(Module &M, Function &F, GlobalVariable *BBCounters, unsigned int NumBBs, IRBuilder<> &Builder)
     {
-      LLVMContext &Context = M.getContext();
-      FunctionType *CovFuncType = FunctionType::get(Type::getVoidTy(Context), {Type::getInt8PtrTy(Context), Type::getInt32Ty(Context), Int64Ty->getPointerTo(), Type::getInt32Ty(Context)}, false);
-      FunctionCallee CovFunc = F.getParent()->getOrInsertFunction("bc_cov", CovFuncType);
+      assert (BBCounters != nullptr && "Global Variable, needed to insert coverage is null");
+      LLVMContext &C = M.getContext();
+      FunctionType *CovFuncType = FunctionType::get(Type::getVoidTy(C), 
+          {Type::getInt8PtrTy(C), Type::getInt32Ty(C), Type::getInt64PtrTy(C), Type::getInt32Ty(C)}, false);
+      FunctionCallee CovFunc = M.getOrInsertFunction("bc_cov", CovFuncType);
 
       // Create arguments for the call
       Constant *FuncNameStr = Builder.CreateGlobalStringPtr(F.getName());
       Value *FuncNameLen = Builder.getInt32(F.getName().size());
-      Value *BBCountersPtr = Builder.CreatePointerCast(BBCounters, Int64Ty->getPointerTo());
       Value *NumBBsVal = Builder.getInt32(NumBBs);
+      Value *CastedGlob = Builder.CreateBitCast(BBCounters, Type::getInt64PtrTy(C));
 
-      // Insert call at the end of the function
-      for (auto &BB : F)
-      {
-        if (isa<ReturnInst>(BB.getTerminator()))
-        {
-          Builder.SetInsertPoint(BB.getTerminator());
-          Builder.CreateCall(CovFunc, {FuncNameStr, FuncNameLen, BBCountersPtr, NumBBsVal});
-        }
-      }
+      llvm::dbgs() << "Function name: " << F.getName() << "\n";
+      
+      llvm::dbgs() << "Function name length: " << F.getName().size() << "\n";
+      llvm::dbgs() << "Number of basic blocks: " << NumBBs << "\n";
+      BBCounters->dump();
+
+      F.dump();
+
+      Builder.CreateCall(CovFunc, {FuncNameStr, FuncNameLen, CastedGlob, NumBBsVal});
     }
   };
 } // namespace

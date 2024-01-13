@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 FILE *cov_fp = NULL;
 
@@ -35,11 +37,11 @@ void bc_cov_set_file(char *file_name, int file_name_len, int num_funcs) {
     fwrite(&num_funcs, sizeof(int), 1, cov_fp);
 }
 
-void bc_cov(char *func_name, int func_name_len, int *cov_array, int cov_array_len) {
+void bc_cov(char *func_name, int func_name_len, u_int64_t *cov_array, int cov_array_len) {
     // write the function name to the file
     // write the coverage array to the file
     fwrite(&func_name_len, sizeof(int), 1, cov_fp);
     fwrite(func_name, sizeof(char), func_name_len, cov_fp);
-    fwrite(&cov_array_len, sizeof(int), 1, cov_fp);
+    fwrite(&cov_array_len, sizeof(u_int64_t), 1, cov_fp);
     fwrite( cov_array, sizeof(int), cov_array_len, cov_fp);
 }

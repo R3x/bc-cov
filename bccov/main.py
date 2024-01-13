@@ -3,6 +3,7 @@ import pathlib
 
 from bccov.config import set_config
 from bccov.llvm import build_passes, run_passes
+from bccov.runtime import build_runtime, link_runtime
 from bccov.utils.pylogger import set_global_log_level
 
 
@@ -44,5 +45,7 @@ def run_cli():
     set_config(args.config_file)
     set_global_log_level("DEBUG")
     build_passes()
+    build_runtime()
 
     run_passes("CovInstrument", args.bitcode_file, "/tmp/instrumented.bc")
+    link_runtime("/tmp/instrumented.bc", "/tmp/final_linked.bc")
