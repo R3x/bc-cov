@@ -73,10 +73,10 @@ namespace
         // Create an atomic increment for the corresponding counter
         std::vector<Value *> Indices{ConstantInt::get(Type::getInt64Ty(C), 0), ConstantInt::get(Type::getInt64Ty(C), BBIndex++)};
         Value *Ptr = Builder.CreateInBoundsGEP(BBCounters, Indices);
-        LoadInst *LoadedVal = Builder.CreateAlignedLoad(Type::getInt64Ty(C), Ptr, 0);
+        LoadInst *LoadedVal = Builder.CreateAlignedLoad(Type::getInt64Ty(C), Ptr, 8);
         LoadedVal->setAtomic(AtomicOrdering::Monotonic);
         Value *IncVal = Builder.CreateAdd(LoadedVal, ConstantInt::get(Type::getInt64Ty(C), 1));
-        StoreInst *Store = Builder.CreateAlignedStore(IncVal, Ptr, 0);
+        StoreInst *Store = Builder.CreateAlignedStore(IncVal, Ptr, 8);
         Store->setAtomic(AtomicOrdering::Monotonic);
       }
     }
@@ -113,6 +113,8 @@ namespace
           insertCovCall(M, *F, BBCounters, NumBBs, builder);
         }
       }
+
+      builder.CreateRetVoid();
     }
 
     void insertSetFileCall(Module &M, const std::string &fileName, int numFuncs, IRBuilder<> &Builder)
@@ -150,7 +152,7 @@ namespace
       llvm::dbgs() << "Number of basic blocks: " << NumBBs << "\n";
       BBCounters->dump();
 
-      F.dump();
+      // F.dump();
 
       Builder.CreateCall(CovFunc, {FuncNameStr, FuncNameLen, CastedGlob, NumBBsVal});
     }

@@ -1,3 +1,4 @@
 {
-    "LLVM_OPT" : "opt"
+    "LLVM_OPT" : "opt",
+    "LLVM_LINK" : "llvm-link"
 }

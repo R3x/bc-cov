@@ -2,6 +2,9 @@ import json
 import pathlib
 
 LLVM_OPT = "opt"
+LLVM_LINK = "llvm-link"
+
+
 RUNTIME_DIR = None
 LIB_DIR = None
 
@@ -19,7 +22,7 @@ def set_local_paths():
 
 
 def set_config(path_to_config: pathlib.Path):
-    global LLVM_OPT
+    global LLVM_OPT, LLVM_LINK
 
     set_local_paths()
     assert path_to_config.exists(), f"Config file {path_to_config} does not exist"
@@ -28,6 +31,6 @@ def set_config(path_to_config: pathlib.Path):
         with open(path_to_config, "r") as f:
             config = json.load(f)
             LLVM_OPT = config.get("LLVM_OPT", LLVM_OPT)
-
+            LLVM_LINK = config.get("LLVM_LINK", LLVM_LINK)
     except json.decoder.JSONDecodeError as e:
         raise Exception(f"Config file {path_to_config} is not a valid JSON file") from e

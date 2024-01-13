@@ -1,6 +1,7 @@
 import argparse
 import pathlib
 
+from bccov.compile import build_binary
 from bccov.config import set_config
 from bccov.llvm import build_passes, run_passes
 from bccov.runtime import build_runtime, link_runtime
@@ -49,3 +50,4 @@ def run_cli():
 
     run_passes("CovInstrument", args.bitcode_file, "/tmp/instrumented.bc")
     link_runtime("/tmp/instrumented.bc", "/tmp/final_linked.bc")
+    build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
