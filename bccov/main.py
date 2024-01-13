@@ -2,9 +2,11 @@ import argparse
 import pathlib
 
 from bccov.config import set_config
+from bccov.llvm import build_passes, run_passes
+from bccov.utils.pylogger import set_global_log_level
 
 
-def main():
+def run_cli():
     parser = argparse.ArgumentParser(
         description="Run an LLVM pass on a bitcode file and process input and source directories."
     )
@@ -40,4 +42,7 @@ def main():
     args = parser.parse_args()
 
     set_config(args.config_file)
+    set_global_log_level("DEBUG")
     build_passes()
+
+    run_passes("CovInstrument", args.bitcode_file, "/tmp/instrumented.bc")

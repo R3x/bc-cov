@@ -1,1 +1,1 @@
-from .main import run_cli
+from bccov.main import run_cli
