@@ -35,10 +35,14 @@ namespace
         // Create a global array for each function
         unsigned int NumBBs = std::distance(F.begin(), F.end());
         ArrayType *ArrayTy = ArrayType::get(Int64Ty, NumBBs);
-        std::string funcName = F.getName().str() + "_counters";
-        llvm::dbgs() << "Creating Function Array: " << funcName << "\n";
-        GlobalVariable *BBCounters = dyn_cast<GlobalVariable>(M.getOrInsertGlobal(funcName, ArrayTy));
+        std::string counterName  = F.getName().str() + "_counters";
+        llvm::dbgs() << "Creating Function Array: " << counterName << "\n";
+        // GlobalVariable *BBCounters = dyn_cast<GlobalVariable>(M.getOrInsertGlobal(funcName, ArrayTy));
+        auto *initializer = ConstantAggregateZero::get(ArrayTy);
+        GlobalVariable *BBCounters = new GlobalVariable(M, ArrayTy, false, GlobalValue::InternalLinkage, initializer, counterName);
         
+        // BBCounters->setInitializer(InitVal);
+
         // new GlobalVariable(M, ArrayTy, false, 
         //   GlobalValue::InternalLinkage, Constant::getNullValue(ArrayTy), funcName);
 
@@ -85,9 +89,8 @@ namespace
     {
       LLVMContext &C = M.getContext();
       // create a new function named _bc_cov_dump 
-      FunctionType *DumpFuncType = FunctionType::get(Type::getVoidTy(C), false);
-      Function *DumpFunc = Function::Create(DumpFuncType, GlobalValue::ExternalLinkage, "_bc_cov_dump", &M);
-
+      FunctionType *funcType = FunctionType::get(Type::getVoidTy(C), false);
+      Function *DumpFunc = Function::Create(funcType, Function::ExternalLinkage, "_bc_dump_cov", &M);
 
       BasicBlock *BB = BasicBlock::Create(C, "entry", DumpFunc);
       IRBuilder<> builder(BB);
@@ -106,7 +109,7 @@ namespace
           // Get the global counters array for the function
           std::string funcName = F->getName().str() + "_counters";
           llvm::dbgs() << "Finding array : " << funcName << "\n";
-          GlobalVariable *BBCounters = M.getGlobalVariable(funcName);
+          GlobalVariable *BBCounters = M.getGlobalVariable(funcName, true);
           unsigned int NumBBs = std::distance(F->begin(), F->end());
 
           // Insert call to bc_cov
@@ -115,6 +118,7 @@ namespace
       }
 
       builder.CreateRetVoid();
+      DumpFunc->dump();
     }
 
     void insertSetFileCall(Module &M, const std::string &fileName, int numFuncs, IRBuilder<> &Builder)

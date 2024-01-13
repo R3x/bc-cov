@@ -4,7 +4,7 @@ import pathlib
 from bccov.compile import build_binary
 from bccov.config import set_config
 from bccov.llvm import build_passes, run_passes
-from bccov.runtime import build_runtime, link_runtime
+from bccov.runtime import build_runtime, link_runtime, run_and_collect_coverage
 from bccov.utils.pylogger import set_global_log_level
 
 
@@ -49,5 +49,16 @@ def run_cli():
     build_runtime()
 
     run_passes("CovInstrument", args.bitcode_file, "/tmp/instrumented.bc")
-    link_runtime("/tmp/instrumented.bc", "/tmp/final_linked.bc")
+    link_runtime(
+        pathlib.Path("/tmp/instrumented.bc"), pathlib.Path("/tmp/final_linked.bc")
+    )
     build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
+
+    for input_file in args.input_dir.glob("*"):
+        if not input_file.is_file():
+            continue
+        run_and_collect_coverage(
+            pathlib.Path("/tmp/final_binary"),
+            pathlib.Path("/tmp/target.bc_cov"),
+            input_file,
+        )

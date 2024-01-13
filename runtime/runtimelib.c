@@ -13,7 +13,7 @@ void bc_init_cov() {
     // if it is not set, then create default.bc_cov
     // and store the file descriptor in a global variable
 
-    char *bc_cov_file = getenv("bc_COV_FILE");
+    char *bc_cov_file = getenv("BC_COV_FILE");
     if (bc_cov_file == NULL) {
         bc_cov_file = "default.bc_cov";
     }   
