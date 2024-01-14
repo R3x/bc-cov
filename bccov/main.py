@@ -3,7 +3,11 @@ import pathlib
 
 from bccov.compile import build_binary
 from bccov.config import set_config
-from bccov.coverage import parse_coverage_file, print_coverage_stats
+from bccov.coverage import (
+    parse_cov_info_file,
+    parse_coverage_file,
+    print_coverage_stats,
+)
 from bccov.llvm import build_passes, run_passes
 from bccov.runtime import build_runtime, link_runtime, run_and_collect_coverage
 from bccov.utils.pylogger import set_global_log_level
@@ -56,13 +60,16 @@ def run_cli():
     build_passes()
     build_runtime()
 
-    run_passes("CovInstrument", args.bitcode_file, "/tmp/instrumented.bc")
+    run_passes(
+        "CovInstrument", args.bitcode_file, "/tmp/instrumented.bc", "/tmp/cov_info.json"
+    )
     link_runtime(
         pathlib.Path("/tmp/instrumented.bc"),
         pathlib.Path("/tmp/final_linked.bc"),
         args.debug,
     )
     build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
+    parse_cov_info_file(pathlib.Path("/tmp/cov_info.json"))
 
     for input_file in args.input_dir.glob("*"):
         if not input_file.is_file():

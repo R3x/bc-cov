@@ -9,14 +9,29 @@
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/Support/Debug.h>
+#include <llvm/Support/CommandLine.h>
+
+#include <set>
+#include <map>
+#include <fstream>
+
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 
 using namespace llvm;
+
+// Create an option to pass the output file name
+static cl::opt<std::string> OutputFilename("output", cl::desc("Specify output filename"), cl::value_desc("filename"));
 
 namespace
 {
   struct CovInstrument : public ModulePass
   {
     static char ID;
+    rapidjson::StringBuffer s; 
+    rapidjson::Writer<rapidjson::StringBuffer> writer;
+
     CovInstrument() : ModulePass(ID) {}
 
     bool runOnModule(Module &M) override
@@ -24,6 +39,8 @@ namespace
       LLVMContext &C = M.getContext();
       IntegerType *Int64Ty = Type::getInt64Ty(C);
       std::map<std::string, std::vector<Function *>> fileFunctionMap;
+	    this->writer.Reset(this->s);
+      this->writer.StartObject();
 
       for (Function &F : M)
       {
@@ -40,14 +57,11 @@ namespace
         // GlobalVariable *BBCounters = dyn_cast<GlobalVariable>(M.getOrInsertGlobal(funcName, ArrayTy));
         auto *initializer = ConstantAggregateZero::get(ArrayTy);
         GlobalVariable *BBCounters = new GlobalVariable(M, ArrayTy, false, GlobalValue::InternalLinkage, initializer, counterName);
-        
-        // BBCounters->setInitializer(InitVal);
 
-        // new GlobalVariable(M, ArrayTy, false, 
-        //   GlobalValue::InternalLinkage, Constant::getNullValue(ArrayTy), funcName);
+        this->writer.Key(F.getName().str().c_str());
 
         // Insert atomic increment operations in each basic block
-        insertAtomicIncrements(F, BBCounters);
+        insertAtomicIncrements(F, BBCounters);              
 
         // Group functions by file name
         if (DISubprogram *SP = F.getSubprogram())
@@ -61,18 +75,62 @@ namespace
 
       // Insert calls to bc_cov_set_file and bc_cov
       insertbcCovCalls(M, fileFunctionMap);
+      this->writer.EndObject();
+
+      // Write the output to a file
+      std::string output = this->s.GetString();
+      // llvm::dbgs() << output << "\n";
+
+      std::ofstream out(OutputFilename);
+      out << output;
+      out.close();
 
       return true;
+    }
+
+    void AddBasicBlockCoverage(BasicBlock *BB)
+    {
+      this->writer.Key("Coverage");
+      this->writer.StartArray();
+
+      std::set<std::tuple<std::string, uint32_t>> covinfo;
+       
+      for (Instruction &I : *BB) {
+        if (const llvm::DebugLoc &DL = I.getDebugLoc()) {
+          std::string filename = DL->getFilename().str();
+          uint32_t line = DL->getLine();
+          covinfo.insert(std::make_tuple(filename, line));
+        }
+      }
+
+      for (auto &info : covinfo) {
+        this->writer.StartObject();
+        this->writer.Key("File");
+        this->writer.String(std::get<0>(info).c_str());
+        this->writer.Key("Line");
+        this->writer.Uint(std::get<1>(info));
+        this->writer.EndObject();
+      }
+
+      this->writer.EndArray();
     }
 
     void insertAtomicIncrements(Function &F, GlobalVariable *BBCounters)
     {
       unsigned int BBIndex = 0;
+      this->writer.StartArray();
+      
       for (BasicBlock &BB : F)
       {
         Instruction *InsI = &(*(BB.getFirstInsertionPt()));
         IRBuilder<> Builder(InsI);
         LLVMContext &C = BB.getContext();
+
+        this->writer.StartObject();
+        this->writer.Key("Id");
+        this->writer.Uint(BBIndex);
+        AddBasicBlockCoverage(&BB);
+        this->writer.EndObject();
 
         // Create an atomic increment for the corresponding counter
         std::vector<Value *> Indices{ConstantInt::get(Type::getInt64Ty(C), 0), ConstantInt::get(Type::getInt64Ty(C), BBIndex++)};
@@ -83,6 +141,8 @@ namespace
         StoreInst *Store = Builder.CreateAlignedStore(IncVal, Ptr, 8);
         Store->setAtomic(AtomicOrdering::Monotonic);
       }
+
+      this->writer.EndArray();
     }
 
     void insertbcCovCalls(Module &M, std::map<std::string, std::vector<Function *>> &fileFunctionMap)

@@ -1,3 +1,4 @@
+import json
 import pathlib
 import struct
 
@@ -5,6 +6,12 @@ import struct
 class CoverageStats:
 
     COV_MAP = {}
+
+    @staticmethod
+    def init_cov_info(cov_info: dict):
+        for func_name in cov_info:
+            pass
+        pass
 
     @staticmethod
     def add_cov_map(cov_map):
@@ -48,6 +55,15 @@ def read_uint64(f):
     if size == b"":
         return None
     return struct.unpack("Q", size)[0]
+
+
+def parse_cov_info_file(cov_info_file: pathlib.Path):
+    assert (
+        cov_info_file.exists() and cov_info_file.is_file()
+    ), f"Coverage info file {cov_info_file} does not exist"
+
+    cov_json = json.loads(cov_info_file.read_text())
+    print(cov_json)
 
 
 def parse_coverage_file(cov_file: pathlib.Path):

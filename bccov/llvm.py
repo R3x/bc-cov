@@ -9,14 +9,19 @@ def build_passes():
     run_cmd("./build.sh", cwd=config.LIB_DIR, verbose=True)
 
 
-def run_passes(pass_name: str, bitcode_file: str, output_file: str):
+def run_passes(
+    pass_name: str,
+    bitcode_file: str,
+    output_bitcode_file: str,
+    output_cov_info_file: str,
+):
     PASS_MAP = {"CovInstrument": f"{config.LIB_DIR}/build/libCovInstrument.so"}
     # run run.sh
     run_cmd(
-        f"{config.LLVM_OPT} -f -load {PASS_MAP[pass_name]} -cov-instrument < {bitcode_file} > {output_file}",
+        f"{config.LLVM_OPT} -f -load {PASS_MAP[pass_name]} -output {output_cov_info_file} -cov-instrument < {bitcode_file} > {output_bitcode_file}",
         verbose=True,
     )
-    output_file = pathlib.Path(output_file)
+    output_bitcode_file = pathlib.Path(output_bitcode_file)
     assert (
-        output_file.exists() and output_file.is_file()
-    ), f"Output file {output_file} does not exist"
+        output_bitcode_file.exists() and output_bitcode_file.is_file()
+    ), f"Output file {output_bitcode_file} does not exist"

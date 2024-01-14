@@ -40,6 +40,8 @@ else()
         set(IN_SOURCE_BUILD 1)
 endif()
 
+include_directories(include/)
+
 add_library(CovInstrument MODULE src/CovInstrument.cpp)
 
 # add statically linked library
