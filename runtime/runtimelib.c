@@ -21,12 +21,18 @@ void bc_init_cov() {
     printf("bc_cov_file: %s\n", bc_cov_file);
 #endif
     // open the file
+    // if the file exists, delete it
+    if (access(bc_cov_file, F_OK) != -1) {
+        remove(bc_cov_file);
+    }
+
     cov_fp = fopen(bc_cov_file, "w");
 }
 
 __attribute__((destructor))
 void bc_dump_cov() {
     _bc_dump_cov();
+    fclose(cov_fp);
 }
 
 void bc_cov_set_file(char *file_name, int file_name_len, int num_funcs) {
@@ -40,8 +46,18 @@ void bc_cov_set_file(char *file_name, int file_name_len, int num_funcs) {
 void bc_cov(char *func_name, int func_name_len, u_int64_t *cov_array, int cov_array_len) {
     // write the function name to the file
     // write the coverage array to the file
+#ifdef DEBUG
+    printf("func_name: %s\n", func_name);
+    printf("func_name_len: %d\n", func_name_len);
+#endif
     fwrite(&func_name_len, sizeof(int), 1, cov_fp);
     fwrite(func_name, sizeof(char), func_name_len, cov_fp);
-    fwrite(&cov_array_len, sizeof(u_int64_t), 1, cov_fp);
-    fwrite( cov_array, sizeof(int), cov_array_len, cov_fp);
+#ifdef DEBUG
+    printf("cov_array_len: %d\n", cov_array_len);
+    for (int i = 0; i < cov_array_len; i++) {
+        printf("%lu,", cov_array[i]);
+    }
+#endif
+    fwrite(&cov_array_len, sizeof(int), 1, cov_fp);
+    fwrite(cov_array, sizeof(u_int64_t), cov_array_len, cov_fp);
 }

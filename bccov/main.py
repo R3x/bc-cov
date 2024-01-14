@@ -3,6 +3,7 @@ import pathlib
 
 from bccov.compile import build_binary
 from bccov.config import set_config
+from bccov.coverage import parse_coverage_file
 from bccov.llvm import build_passes, run_passes
 from bccov.runtime import build_runtime, link_runtime, run_and_collect_coverage
 from bccov.utils.pylogger import set_global_log_level
@@ -40,17 +41,26 @@ def run_cli():
         help="Path to the configuration file",
         default=pathlib.Path("config.json"),
     )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Enable debug logging",
+    )
 
     args = parser.parse_args()
 
     set_config(args.config_file)
-    set_global_log_level("DEBUG")
+    if args.debug:
+        set_global_log_level("DEBUG")
     build_passes()
     build_runtime()
 
     run_passes("CovInstrument", args.bitcode_file, "/tmp/instrumented.bc")
     link_runtime(
-        pathlib.Path("/tmp/instrumented.bc"), pathlib.Path("/tmp/final_linked.bc")
+        pathlib.Path("/tmp/instrumented.bc"),
+        pathlib.Path("/tmp/final_linked.bc"),
+        args.debug,
     )
     build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
 
@@ -62,3 +72,4 @@ def run_cli():
             pathlib.Path("/tmp/target.bc_cov"),
             input_file,
         )
+        parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"))

@@ -5,19 +5,27 @@ from bccov.utils.commands import run_cmd
 
 
 def build_runtime():
-    run_cmd("make", cwd=config.RUNTIME_DIR, verbose=True)
+    run_cmd("make all", cwd=config.RUNTIME_DIR, verbose=True)
 
 
-def link_runtime(input_bitcode: pathlib.Path, output_bitcode: pathlib.Path):
+def link_runtime(
+    input_bitcode: pathlib.Path, output_bitcode: pathlib.Path, debug: bool = False
+):
 
     assert all(
         p.exists() and p.is_file() for p in [input_bitcode, output_bitcode]
     ), f"Input files do not exist"
 
-    run_cmd(
-        f"{config.LLVM_LINK} {input_bitcode} {config.RUNTIME_DIR}/runtime.bc -o {output_bitcode}",
-        verbose=True,
-    )
+    if debug:
+        run_cmd(
+            f"{config.LLVM_LINK} {input_bitcode} {config.RUNTIME_DIR}/debugruntime.bc -o {output_bitcode}",
+            verbose=True,
+        )
+    else:
+        run_cmd(
+            f"{config.LLVM_LINK} {input_bitcode} {config.RUNTIME_DIR}/runtime.bc -o {output_bitcode}",
+            verbose=True,
+        )
 
 
 def run_and_collect_coverage(

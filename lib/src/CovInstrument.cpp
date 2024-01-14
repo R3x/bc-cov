@@ -118,7 +118,6 @@ namespace
       }
 
       builder.CreateRetVoid();
-      DumpFunc->dump();
     }
 
     void insertSetFileCall(Module &M, const std::string &fileName, int numFuncs, IRBuilder<> &Builder)
@@ -154,7 +153,7 @@ namespace
       
       llvm::dbgs() << "Function name length: " << F.getName().size() << "\n";
       llvm::dbgs() << "Number of basic blocks: " << NumBBs << "\n";
-      BBCounters->dump();
+      // BBCounters->dump();
 
       // F.dump();
 
