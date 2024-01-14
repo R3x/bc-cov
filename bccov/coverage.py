@@ -2,6 +2,40 @@ import pathlib
 import struct
 
 
+class CoverageStats:
+
+    COV_MAP = {}
+
+    @staticmethod
+    def add_cov_map(cov_map):
+        for file_name, func_map in cov_map.items():
+            if file_name not in CoverageStats.COV_MAP:
+                CoverageStats.COV_MAP[file_name] = {}
+            for func_name, cov_array in func_map.items():
+                if func_name not in CoverageStats.COV_MAP[file_name]:
+                    CoverageStats.COV_MAP[file_name][func_name] = [0] * len(cov_array)
+                assert len(cov_array) == len(
+                    CoverageStats.COV_MAP[file_name][func_name]
+                )
+                for i in range(len(cov_array)):
+                    CoverageStats.COV_MAP[file_name][func_name][i] = max(
+                        CoverageStats.COV_MAP[file_name][func_name][i], cov_array[i]
+                    )
+
+    @staticmethod
+    def get_cov_map():
+        return CoverageStats.COV_MAP
+
+    @staticmethod
+    def print_cov_map():
+        for file_name, func_map in CoverageStats.COV_MAP.items():
+            print(file_name)
+            for func_name, cov_array in func_map.items():
+                print(f"\t{func_name} : ", end="")
+                for i in range(len(cov_array)):
+                    print(f"{cov_array[i]}", end=" ")
+
+
 def read_size(f):
     size = f.read(4)
     if size == b"":
@@ -49,8 +83,12 @@ def parse_coverage_file(cov_file: pathlib.Path):
                 cov_array.append(read_uint64(f))
 
             func_map[function_name] = cov_array
+            print(f"{function_name} : {cov_array}")
 
         cov_map[file_name] = func_map
 
-    print(cov_map)
-    return cov_map
+    CoverageStats.add_cov_map(cov_map)
+
+
+def print_coverage_stats():
+    CoverageStats.print_cov_map()
