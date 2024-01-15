@@ -1,32 +1,59 @@
+from collections import namedtuple
 import json
 import pathlib
 import struct
 
+LineDetails = namedtuple("LineDetails", ["file_name", "line_no"])
+CoverageDetails = namedtuple(
+    "CoverageDetails", ["coverage_index", "id", "line_details"]
+)
+Function = namedtuple("Function", ["name", "file_name"])
+
 
 class CoverageStats:
-
     COV_MAP = {}
 
     @staticmethod
+    def cov_info_array_parse(cov_array: list):
+        parsed_array = []
+        for bb_obj in cov_array:
+            id = bb_obj["Id"]
+            linemap = []
+            for line_obj in bb_obj["Coverage"]:
+                linemap.append(LineDetails(line_obj["File"], line_obj["Line"]))
+            parsed_array.append(CoverageDetails(0, id, linemap))
+        return parsed_array
+
+    @staticmethod
     def init_cov_info(cov_info: dict):
-        for func_name in cov_info:
-            pass
-        pass
+        for file_name, func_map in cov_info.items():
+            for func_obj in func_map:
+                f = Function(name=func_obj["Function"], file_name=file_name)
+                CoverageStats.COV_MAP[f] = CoverageStats.cov_info_array_parse(
+                    func_obj["BasicBlocks"]
+                )
 
     @staticmethod
     def add_cov_map(cov_map):
         for file_name, func_map in cov_map.items():
-            if file_name not in CoverageStats.COV_MAP:
-                CoverageStats.COV_MAP[file_name] = {}
             for func_name, cov_array in func_map.items():
-                if func_name not in CoverageStats.COV_MAP[file_name]:
-                    CoverageStats.COV_MAP[file_name][func_name] = [0] * len(cov_array)
+                f = Function(name=func_name.decode(), file_name=file_name.decode())
+
+                assert f in CoverageStats.COV_MAP, f"Function {f} not found in COV_MAP"
                 assert len(cov_array) == len(
-                    CoverageStats.COV_MAP[file_name][func_name]
-                )
+                    CoverageStats.COV_MAP[f]
+                ), f"Coverage array length mismatch for {f}"
+
                 for i in range(len(cov_array)):
-                    CoverageStats.COV_MAP[file_name][func_name][i] = max(
-                        CoverageStats.COV_MAP[file_name][func_name][i], cov_array[i]
+                    assert (
+                        i == CoverageStats.COV_MAP[f][i].id
+                    ), f"Coverage index mismatch for {f} at index {i}"
+                    CoverageStats.COV_MAP[f][i] = CoverageDetails(
+                        coverage_index=max(
+                            CoverageStats.COV_MAP[f][i].coverage_index, cov_array[i]
+                        ),
+                        id=CoverageStats.COV_MAP[f][i].id,
+                        line_details=CoverageStats.COV_MAP[f][i].line_details,
                     )
 
     @staticmethod
@@ -35,12 +62,14 @@ class CoverageStats:
 
     @staticmethod
     def print_cov_map():
-        for file_name, func_map in CoverageStats.COV_MAP.items():
-            print(file_name)
-            for func_name, cov_array in func_map.items():
-                print(f"\t{func_name} : ", end="")
-                for i in range(len(cov_array)):
-                    print(f"{cov_array[i]}", end=" ")
+        for f, func in CoverageStats.COV_MAP.items():
+            print(f"{f.file_name} | {f.name} : ")
+            for bb in func:
+                print(f"\t{bb.id} : {bb.coverage_index} : {bb.line_details}")
+
+    @staticmethod
+    def print_cov():
+        print(CoverageStats.COV_MAP)
 
 
 def read_size(f):
@@ -63,7 +92,7 @@ def parse_cov_info_file(cov_info_file: pathlib.Path):
     ), f"Coverage info file {cov_info_file} does not exist"
 
     cov_json = json.loads(cov_info_file.read_text())
-    print(cov_json)
+    CoverageStats.init_cov_info(cov_json)
 
 
 def parse_coverage_file(cov_file: pathlib.Path):

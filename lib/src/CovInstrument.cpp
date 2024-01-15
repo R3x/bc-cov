@@ -31,6 +31,7 @@ namespace
     static char ID;
     rapidjson::StringBuffer s; 
     rapidjson::Writer<rapidjson::StringBuffer> writer;
+    std::map<Function *, std::vector<BasicBlock *>> fileBBMap;
 
     CovInstrument() : ModulePass(ID) {}
 
@@ -39,8 +40,6 @@ namespace
       LLVMContext &C = M.getContext();
       IntegerType *Int64Ty = Type::getInt64Ty(C);
       std::map<std::string, std::vector<Function *>> fileFunctionMap;
-	    this->writer.Reset(this->s);
-      this->writer.StartObject();
 
       for (Function &F : M)
       {
@@ -58,7 +57,6 @@ namespace
         auto *initializer = ConstantAggregateZero::get(ArrayTy);
         GlobalVariable *BBCounters = new GlobalVariable(M, ArrayTy, false, GlobalValue::InternalLinkage, initializer, counterName);
 
-        this->writer.Key(F.getName().str().c_str());
 
         // Insert atomic increment operations in each basic block
         insertAtomicIncrements(F, BBCounters);              
@@ -75,16 +73,6 @@ namespace
 
       // Insert calls to bc_cov_set_file and bc_cov
       insertbcCovCalls(M, fileFunctionMap);
-      this->writer.EndObject();
-
-      // Write the output to a file
-      std::string output = this->s.GetString();
-      // llvm::dbgs() << output << "\n";
-
-      std::ofstream out(OutputFilename);
-      out << output;
-      out.close();
-
       return true;
     }
 
@@ -118,20 +106,13 @@ namespace
     void insertAtomicIncrements(Function &F, GlobalVariable *BBCounters)
     {
       unsigned int BBIndex = 0;
-      this->writer.StartArray();
-      
+      std::vector <BasicBlock *> BBs;
       for (BasicBlock &BB : F)
       {
         Instruction *InsI = &(*(BB.getFirstInsertionPt()));
         IRBuilder<> Builder(InsI);
         LLVMContext &C = BB.getContext();
-
-        this->writer.StartObject();
-        this->writer.Key("Id");
-        this->writer.Uint(BBIndex);
-        AddBasicBlockCoverage(&BB);
-        this->writer.EndObject();
-
+        BBs.push_back(&BB);
         // Create an atomic increment for the corresponding counter
         std::vector<Value *> Indices{ConstantInt::get(Type::getInt64Ty(C), 0), ConstantInt::get(Type::getInt64Ty(C), BBIndex++)};
         Value *Ptr = Builder.CreateInBoundsGEP(BBCounters, Indices);
@@ -141,8 +122,7 @@ namespace
         StoreInst *Store = Builder.CreateAlignedStore(IncVal, Ptr, 8);
         Store->setAtomic(AtomicOrdering::Monotonic);
       }
-
-      this->writer.EndArray();
+      this->fileBBMap[&F] = BBs;
     }
 
     void insertbcCovCalls(Module &M, std::map<std::string, std::vector<Function *>> &fileFunctionMap)
@@ -154,6 +134,9 @@ namespace
 
       BasicBlock *BB = BasicBlock::Create(C, "entry", DumpFunc);
       IRBuilder<> builder(BB);
+	    
+      this->writer.Reset(this->s);
+      this->writer.StartObject();
 
       for (auto &fileFuncPair : fileFunctionMap)
       {
@@ -163,21 +146,52 @@ namespace
 
         // Insert call to bc_cov_set_file
         insertSetFileCall(M, fileName, numFuncs, builder);
+        this->writer.Key(fileName.c_str());
+        this->writer.StartArray();
+
 
         for (Function *F : functions)
         {
+          this->writer.StartObject();
+          this->writer.Key("Function");
+          this->writer.String(F->getName().str().c_str());
+          this->writer.Key("BasicBlocks");
           // Get the global counters array for the function
           std::string funcName = F->getName().str() + "_counters";
           llvm::dbgs() << "Finding array : " << funcName << "\n";
           GlobalVariable *BBCounters = M.getGlobalVariable(funcName, true);
           unsigned int NumBBs = std::distance(F->begin(), F->end());
+          
+          unsigned int BBIndex = 0;
+          this->writer.StartArray();
+          for (BasicBlock *BB : this->fileBBMap[F]) {
+            this->writer.StartObject();
+            this->writer.Key("Id");
+            this->writer.Uint(BBIndex++);
+            AddBasicBlockCoverage(BB);
+            this->writer.EndObject();
+          }
+          this->writer.EndArray();
+          this->writer.EndObject();
 
           // Insert call to bc_cov
           insertCovCall(M, *F, BBCounters, NumBBs, builder);
         }
+
+        this->writer.EndArray();
       }
 
       builder.CreateRetVoid();
+      
+      this->writer.EndObject();
+
+      // Write the output to a file
+      std::string output = this->s.GetString();
+      // llvm::dbgs() << output << "\n";
+
+      std::ofstream out(OutputFilename);
+      out << output;
+      out.close();
     }
 
     void insertSetFileCall(Module &M, const std::string &fileName, int numFuncs, IRBuilder<> &Builder)

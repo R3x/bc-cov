@@ -8,6 +8,7 @@ from bccov.coverage import (
     parse_coverage_file,
     print_coverage_stats,
 )
+from bccov.indexer import create_code_database
 from bccov.llvm import build_passes, run_passes
 from bccov.runtime import build_runtime, link_runtime, run_and_collect_coverage
 from bccov.utils.pylogger import set_global_log_level
@@ -70,6 +71,7 @@ def run_cli():
     )
     build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
     parse_cov_info_file(pathlib.Path("/tmp/cov_info.json"))
+    create_code_database(args.source_dir)
 
     for input_file in args.input_dir.glob("*"):
         if not input_file.is_file():
