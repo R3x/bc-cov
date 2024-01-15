@@ -57,6 +57,35 @@ class CoverageStats:
                     )
 
     @staticmethod
+    def get_function_coverage(name: str):
+        for f, func in CoverageStats.COV_MAP.items():
+            if f.name == name:
+                return func
+        return None
+
+    @staticmethod
+    def get_lines_covered(function: str):
+        # TODO: not file sensitve
+        stats = CoverageStats.get_function_coverage(function)
+        if stats == None:
+            return []
+        covered_lines = set()
+        uncovered_lines = set()
+        for bb in stats:
+            if bb.coverage_index > 0:
+                for line in bb.line_details:
+                    covered_lines.add(line.line_no)
+            else:
+                for line in bb.line_details:
+                    uncovered_lines.add(line.line_no)
+        intersection = covered_lines.intersection(uncovered_lines)
+        return (
+            covered_lines.difference(intersection),
+            uncovered_lines.difference(intersection),
+            intersection,
+        )
+
+    @staticmethod
     def get_cov_map():
         return CoverageStats.COV_MAP
 
@@ -137,3 +166,16 @@ def parse_coverage_file(cov_file: pathlib.Path):
 
 def print_coverage_stats():
     CoverageStats.print_cov_map()
+
+
+def highlight_lines(function: str, sources: str):
+    covered, uncovered, intersection = CoverageStats.get_lines_covered(function)
+    for line in sources:
+        if line.line in covered:
+            print(f"\033[92m{line.source}\033[0m", end="")
+        elif line.line in uncovered:
+            print(f"\033[91m{line.source}\033[0m", end="")
+        elif line.line in intersection:
+            print(f"\033[93m{line.source}\033[0m", end="")
+        else:
+            print(line.source, end="")

@@ -1,3 +1,5 @@
+from typing import List
+from collections import namedtuple
 import os
 
 import clang.cindex
@@ -5,6 +7,8 @@ import clang.cindex
 from bccov.utils import get_logger
 
 logger = get_logger(__name__, "DEBUG")
+
+sources = namedtuple("sources", ["source", "line", "file_path"])
 
 
 class CodebaseAnalyzer:
@@ -63,7 +67,7 @@ class CodebaseAnalyzer:
         else:
             return None
 
-    def get_function_source(self, function_name):
+    def get_function_source(self, function_name) -> List[sources]:
         """
         :param function_name: Name of the function to find source of
 
@@ -76,9 +80,11 @@ class CodebaseAnalyzer:
                 with open(file_path, "r") as file:
                     lines = file.readlines()
                 # prepend each line with the line number and a tab
+                new_lines = []
                 for i in range(start_line, end_line + 1):
-                    lines[i - 1] = f"{i}:\t{lines[i - 1]}"
-                return file_path, "".join(lines[start_line - 1 : end_line])
+                    new_lines.append(sources(f"{i}:\t{lines[i - 1]}", i - 1, file_path))
+
+                return new_lines
 
 
 DB = None

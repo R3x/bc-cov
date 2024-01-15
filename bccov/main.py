@@ -4,11 +4,12 @@ import pathlib
 from bccov.compile import build_binary
 from bccov.config import set_config
 from bccov.coverage import (
+    highlight_lines,
     parse_cov_info_file,
     parse_coverage_file,
     print_coverage_stats,
 )
-from bccov.indexer import create_code_database
+from bccov.indexer import create_code_database, get_function_source
 from bccov.llvm import build_passes, run_passes
 from bccov.runtime import build_runtime, link_runtime, run_and_collect_coverage
 from bccov.utils.pylogger import set_global_log_level
@@ -52,6 +53,13 @@ def run_cli():
         action="store_true",
         help="Enable debug logging",
     )
+    parser.add_argument(
+        "-f",
+        "--function",
+        help="Name of the function to get source of",
+        type=str,
+        default="",
+    )
 
     args = parser.parse_args()
 
@@ -83,4 +91,6 @@ def run_cli():
         )
         parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"))
 
-    print_coverage_stats()
+    # print_coverage_stats()
+    sources = get_function_source(args.function)
+    highlight_lines(args.function, sources)
