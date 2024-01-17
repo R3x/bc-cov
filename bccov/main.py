@@ -1,8 +1,9 @@
 import argparse
+import os
 import pathlib
 
 from bccov.compile import build_binary
-from bccov.config import set_config
+from bccov.config import TESTS_DIR, set_config
 from bccov.coverage import (
     highlight_lines,
     parse_cov_info_file,
@@ -60,6 +61,12 @@ def run_cli():
         type=str,
         default="",
     )
+    parser.add_argument(
+        "--skip-file",
+        help="File containing list of functions to skip",
+        type=pathlib.Path,
+        default=pathlib.Path(TESTS_DIR / "griller.skip"),
+    )
 
     args = parser.parse_args()
 
@@ -70,7 +77,11 @@ def run_cli():
     build_runtime()
 
     run_passes(
-        "CovInstrument", args.bitcode_file, "/tmp/instrumented.bc", "/tmp/cov_info.json"
+        pass_name="CovInstrument",
+        bitcode_file=args.bitcode_file,
+        output_bitcode_file="/tmp/instrumented.bc",
+        output_cov_info_file="/tmp/cov_info.json",
+        skip_file=args.skip_file,
     )
     link_runtime(
         pathlib.Path("/tmp/instrumented.bc"),
@@ -91,6 +102,6 @@ def run_cli():
         )
         parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"))
 
-    # print_coverage_stats()
+    print_coverage_stats()
     sources = get_function_source(args.function)
     highlight_lines(args.function, sources)

@@ -100,6 +100,18 @@ class CoverageStats:
     def print_cov():
         print(CoverageStats.COV_MAP)
 
+    @staticmethod
+    def print_stats():
+        for f, func in CoverageStats.COV_MAP.items():
+            print(f"{f.file_name} | {f.name} : ")
+            covered = 0
+            total = 0
+            for bb in func:
+                if bb.coverage_index > 0:
+                    covered += 1
+            total = len(func)
+            print(f"\t{covered} / {total} : {covered/total}")
+
 
 def read_size(f):
     size = f.read(4)
@@ -165,7 +177,7 @@ def parse_coverage_file(cov_file: pathlib.Path):
 
 
 def print_coverage_stats():
-    CoverageStats.print_cov_map()
+    CoverageStats.print_stats()
 
 
 def highlight_lines(function: str, sources: str):

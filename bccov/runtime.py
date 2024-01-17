@@ -5,6 +5,7 @@ from bccov.utils.commands import run_cmd
 
 
 def build_runtime():
+    run_cmd("make clean", cwd=config.RUNTIME_DIR, verbose=False)
     run_cmd("make all", cwd=config.RUNTIME_DIR, verbose=True)
 
 

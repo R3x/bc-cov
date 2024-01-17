@@ -23,6 +23,7 @@ using namespace llvm;
 
 // Create an option to pass the output file name
 static cl::opt<std::string> OutputFilename("output", cl::desc("Specify output filename"), cl::value_desc("filename"));
+static cl::opt<std::string> SkipList("skiplist", cl::desc("Specify skiplist filename"), cl::value_desc("filename"));
 
 namespace
 {
@@ -35,8 +36,21 @@ namespace
 
     CovInstrument() : ModulePass(ID) {}
 
+    std::vector<std::string> parseSkipList() {
+      std::vector<std::string> skipList;
+      // check if the file exists
+      std::ifstream infile(SkipList);
+      std::string line;
+      while (std::getline(infile, line)) {
+        skipList.push_back(line);
+      }
+      return skipList;
+    }
+
     bool runOnModule(Module &M) override
     {
+      std::vector<std::string> skipList = parseSkipList();
+
       LLVMContext &C = M.getContext();
       IntegerType *Int64Ty = Type::getInt64Ty(C);
       std::map<std::string, std::vector<Function *>> fileFunctionMap;
@@ -45,6 +59,10 @@ namespace
       {
         if (F.isDeclaration())
         {
+          continue;
+        }
+
+        if (std::find(skipList.begin(), skipList.end(), F.getName().str()) != skipList.end()) {
           continue;
         }
 
@@ -67,7 +85,9 @@ namespace
           std::string FileName = SP->getFile()->getFilename().str();
           fileFunctionMap[FileName].push_back(&F);
         } else {
-          llvm_unreachable("Function does not have a DISubprogram");
+          std::string FileName = "unknown";
+          fileFunctionMap[FileName].push_back(&F);
+          // llvm_unreachable("Function does not have a DISubprogram");
         }
       }
 

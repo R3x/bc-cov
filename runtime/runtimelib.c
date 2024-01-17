@@ -2,8 +2,21 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <errno.h>
+#include <err.h>
+#include <execinfo.h>
 
+int grill_guard_after[100] = {0};
 FILE *cov_fp = NULL;
+int grill_guard_before[100] = {0};
+
+void bc_dump_cov();
+void bc_cov_set_signal_handler();
 
 __attribute__((constructor))
 void bc_init_cov() {
@@ -27,6 +40,62 @@ void bc_init_cov() {
     }
 
     cov_fp = fopen(bc_cov_file, "w");
+    bc_cov_set_signal_handler();
+}
+
+#define PATHMAX 100
+#define MAX_STACK_FRAMES 64
+static void *stack_traces[MAX_STACK_FRAMES];
+static uint8_t alternate_stack[SIGSTKSZ];
+
+void bc_cov_set_signal_handler()
+{
+  /* setup alternate stack */
+  {
+    stack_t ss = {};
+    ss.ss_sp = (void *)alternate_stack;
+    ss.ss_size = SIGSTKSZ;
+    ss.ss_flags = 0;
+
+    if (sigaltstack(&ss, NULL) != 0)
+    {
+      err(1, "sigaltstack");
+    }
+  }
+
+  /* register our signal handlers */
+  {
+    struct sigaction sig_action = {};
+    sig_action.sa_sigaction = bc_dump_cov;
+    sigemptyset(&sig_action.sa_mask);
+
+    sig_action.sa_flags = SA_SIGINFO | SA_ONSTACK;
+
+    if (sigaction(SIGSEGV, &sig_action, NULL) != 0)
+    {
+      err(1, "sigaction");
+    }
+    if (sigaction(SIGFPE, &sig_action, NULL) != 0)
+    {
+      err(1, "sigaction");
+    }
+    if (sigaction(SIGINT, &sig_action, NULL) != 0)
+    {
+      err(1, "sigaction");
+    }
+    if (sigaction(SIGILL, &sig_action, NULL) != 0)
+    {
+      err(1, "sigaction");
+    }
+    if (sigaction(SIGTERM, &sig_action, NULL) != 0)
+    {
+      err(1, "sigaction");
+    }
+    if (sigaction(SIGABRT, &sig_action, NULL) != 0)
+    {
+      err(1, "sigaction");
+    }
+  }
 }
 
 __attribute__((destructor))
@@ -47,16 +116,15 @@ void bc_cov(char *func_name, int func_name_len, u_int64_t *cov_array, int cov_ar
     // write the function name to the file
     // write the coverage array to the file
 #ifdef DEBUG
-    printf("func_name: %s\n", func_name);
-    printf("func_name_len: %d\n", func_name_len);
+    printf("func: %s | ", func_name);
 #endif
     fwrite(&func_name_len, sizeof(int), 1, cov_fp);
     fwrite(func_name, sizeof(char), func_name_len, cov_fp);
 #ifdef DEBUG
-    printf("cov_array_len: %d\n", cov_array_len);
     for (int i = 0; i < cov_array_len; i++) {
         printf("%lu,", cov_array[i]);
     }
+    printf("\n");
 #endif
     fwrite(&cov_array_len, sizeof(int), 1, cov_fp);
     fwrite(cov_array, sizeof(u_int64_t), cov_array_len, cov_fp);

@@ -77,12 +77,16 @@ class CodebaseAnalyzer:
             node = data["functions"].get(function_name)
             if node and node.is_definition():
                 start_line, end_line = node.extent.start.line, node.extent.end.line
-                with open(file_path, "r") as file:
+                with open(file_path, "rb") as file:
                     lines = file.readlines()
                 # prepend each line with the line number and a tab
                 new_lines = []
                 for i in range(start_line, end_line + 1):
-                    new_lines.append(sources(f"{i}:\t{lines[i - 1]}", i - 1, file_path))
+                    new_lines.append(
+                        sources(
+                            f"{i}:\t{lines[i - 1].decode('latin-1')}", i - 1, file_path
+                        )
+                    )
 
                 return new_lines
 
