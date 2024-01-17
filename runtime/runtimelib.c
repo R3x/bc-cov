@@ -14,9 +14,11 @@
 int grill_guard_after[100] = {0};
 FILE *cov_fp = NULL;
 int grill_guard_before[100] = {0};
+int done = 0;
 
 void bc_dump_cov();
 void bc_cov_set_signal_handler();
+void grill_hook_destroy();
 
 __attribute__((constructor)) void bc_init_cov()
 {
@@ -102,8 +104,12 @@ void bc_cov_set_signal_handler()
 
 __attribute__((destructor)) void bc_dump_cov()
 {
+  if (done == 1) exit(-1);
+  done = 1;
+  grill_hook_destroy();
   _bc_dump_cov();
   fclose(cov_fp);
+  exit(-1);
 }
 
 void bc_cov_set_file(char *file_name, int file_name_len, int num_funcs)
