@@ -18,7 +18,10 @@ int done = 0;
 
 void bc_dump_cov();
 void bc_cov_set_signal_handler();
+#ifdef GRILLER
 void grill_hook_destroy();
+#endif
+void _bc_dump_cov();
 
 __attribute__((constructor)) void bc_init_cov()
 {
@@ -106,7 +109,9 @@ __attribute__((destructor)) void bc_dump_cov()
 {
   if (done == 1) exit(-1);
   done = 1;
+#ifdef GRILLER
   grill_hook_destroy();
+#endif
   _bc_dump_cov();
   fclose(cov_fp);
   exit(-1);

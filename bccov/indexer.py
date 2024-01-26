@@ -83,9 +83,7 @@ class CodebaseAnalyzer:
                 new_lines = []
                 for i in range(start_line, end_line + 1):
                     new_lines.append(
-                        sources(
-                            f"{i}:\t{lines[i - 1].decode('latin-1')}", i - 1, file_path
-                        )
+                        sources(f"{i}:\t{lines[i - 1].decode('latin-1')}", i, file_path)
                     )
 
                 return new_lines

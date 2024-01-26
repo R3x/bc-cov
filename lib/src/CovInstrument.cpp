@@ -64,6 +64,8 @@ namespace
         llvm::errs() << "Must specify either bbcount or tracepc\n";
         return false;
       }
+
+      return true;
     }
 
     bool runOnModule(Module &M) override
@@ -111,7 +113,8 @@ namespace
         {
           BBMap[&BB] = BBCounter++;
           
-          IRBuilder<> builder(BB);
+          Instruction *InsI = &(*(BB.getFirstInsertionPt()));
+          IRBuilder<> builder(InsI);
 
           FunctionType *CovFuncType = FunctionType::get(Type::getVoidTy(C),
                                                         {Type::getInt32Ty(C)}, false);
@@ -120,6 +123,7 @@ namespace
           builder.CreateCall(CovFunc, {builder.getInt32(BBMap[&BB])});              
         }
       }
+      return true;
     }
 
     bool BBCountCoverage(Module &M, std::vector<std::string> skipList)

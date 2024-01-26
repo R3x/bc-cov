@@ -19,6 +19,8 @@ int curr_offset = 0;
 char *map = NULL;
 
 void bc_cov_set_signal_handler();
+void bc_dump_cov();
+
 #define MAX_FILE_SIZE 10000
 
 __attribute__((constructor)) void bc_init_cov(void) {
@@ -42,22 +44,24 @@ __attribute__((constructor)) void bc_init_cov(void) {
   fd = open(bc_cov_file, O_CREAT | O_RDWR, 0666);
   if (fd == -1) {
       perror("Error opening file");
-      return 1;
+      exit(-1);
+      return;
   }
 
   if (ftruncate(fd, MAX_FILE_SIZE) == -1) {
       perror("Error setting file size");
       close(fd);
-      return 1;
+      exit(-1);
+      return;
   }
 
   map = mmap(0, MAX_FILE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (map == MAP_FAILED) {
       perror("Error mapping file");
       close(fd);
-      return 1;
+      exit(-1);
+      return; 
   }
-
 }
 
 #define PATHMAX 100
