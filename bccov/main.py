@@ -107,11 +107,13 @@ def tracepc(args: argparse.Namespace):
         output_bitcode_file="/tmp/instrumented.bc",
         output_cov_info_file="/tmp/cov_info.json",
         skip_file=args.skip_file,
+        flags="-tracepc",
     )
     link_runtime(
         pathlib.Path("/tmp/instrumented.bc"),
         pathlib.Path("/tmp/final_linked.bc"),
         args.debug,
+        "tracepc",
     )
 
 
@@ -122,11 +124,13 @@ def bbcov(args: argparse.Namespace):
         output_bitcode_file="/tmp/instrumented.bc",
         output_cov_info_file="/tmp/cov_info.json",
         skip_file=args.skip_file,
+        flags="-bbcount",
     )
     link_runtime(
         pathlib.Path("/tmp/instrumented.bc"),
         pathlib.Path("/tmp/final_linked.bc"),
         args.debug,
+        "bbcov",
     )
     build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
     parse_cov_info_file(pathlib.Path("/tmp/cov_info.json"))

@@ -10,8 +10,12 @@ def build_runtime():
 
 
 def link_runtime(
-    input_bitcode: pathlib.Path, output_bitcode: pathlib.Path, debug: bool = False
+    input_bitcode: pathlib.Path,
+    output_bitcode: pathlib.Path,
+    debug: bool = False,
+    mode: str = "",
 ):
+    BITCODE = {"tracepc": "tracepc_runtime.bc", "bbcov": "bbcov_runtime.bc"}
 
     assert all(
         p.exists() and p.is_file() for p in [input_bitcode, output_bitcode]
@@ -19,12 +23,12 @@ def link_runtime(
 
     if debug:
         run_cmd(
-            f"{config.LLVM_LINK} {input_bitcode} {config.RUNTIME_DIR}/debugruntime.bc -o {output_bitcode}",
+            f"{config.LLVM_LINK} {input_bitcode} {config.RUNTIME_DIR}/debug{BITCODE[mode]} -o {output_bitcode}",
             verbose=True,
         )
     else:
         run_cmd(
-            f"{config.LLVM_LINK} {input_bitcode} {config.RUNTIME_DIR}/runtime.bc -o {output_bitcode}",
+            f"{config.LLVM_LINK} {input_bitcode} {config.RUNTIME_DIR}/{BITCODE[mode]} -o {output_bitcode}",
             verbose=True,
         )
 
