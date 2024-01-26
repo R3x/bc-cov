@@ -1,3 +1,4 @@
+*.bc
 .github_api_keys
 .gcloud.json
 *.db
