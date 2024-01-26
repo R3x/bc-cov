@@ -20,6 +20,9 @@ char *map = NULL;
 
 void bc_cov_set_signal_handler();
 void bc_dump_cov();
+#ifdef GRILLER
+void grill_hook_destroy();
+#endif
 
 #define MAX_FILE_SIZE 10000
 
@@ -123,7 +126,9 @@ __attribute__((destructor)) void bc_dump_cov()
 {
   if (done == 1) exit(-1);
   done = 1;
+#ifdef GRILLER
   grill_hook_destroy();
+#endif
   if (munmap(map, MAX_FILE_SIZE) == -1) {
       perror("Error unmapping file");
   }

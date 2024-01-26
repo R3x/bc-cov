@@ -57,8 +57,8 @@ namespace
       {
         llvm::errs() << "Cannot specify both bbcount and tracepc\n";
         return false;
-      } 
-      
+      }
+
       if (!BBCountCov && !TracePC)
       {
         llvm::errs() << "Must specify either bbcount or tracepc\n";
@@ -77,14 +77,18 @@ namespace
 
       std::vector<std::string> skipList = parseSkipList();
 
-
-      if (BBCountCov) {
+      if (BBCountCov)
+      {
         llvm::dbgs() << "Generating basic block count coverage\n";
         return BBCountCoverage(M, skipList);
-      } else if (TracePC) {
+      }
+      else if (TracePC)
+      {
         llvm::dbgs() << "Generating tracepc coverage\n";
         return TracePCCoverage(M, skipList);
-      } else {
+      }
+      else
+      {
         llvm_unreachable("Invalid coverage type");
       }
     }
@@ -94,6 +98,11 @@ namespace
       LLVMContext &C = M.getContext();
       std::map<std::string, std::vector<Function *>> fileFunctionMap;
       std::map<BasicBlock *, uint32_t> BBMap;
+
+      this->writer.Reset(this->s);
+      this->writer.StartObject();
+      this->writer.Key("BasicBlock");
+      this->writer.StartArray();
 
       uint32_t BBCounter = 0;
       for (Function &F : M)
@@ -107,22 +116,41 @@ namespace
         {
           continue;
         }
-
+        
         // Assign a unique basic block id to each basic block
         for (BasicBlock &BB : F)
         {
-          BBMap[&BB] = BBCounter++;
+          this->writer.StartObject();
+          this->writer.Key("Id");
+          this->writer.Uint(BBCounter);          
+
+          BBMap[&BB] = BBCounter++;          
           
+          AddBasicBlockCoverage(&BB);
+
           Instruction *InsI = &(*(BB.getFirstInsertionPt()));
           IRBuilder<> builder(InsI);
+          builder.SetCurrentDebugLocation(getNearestDebugInfo(dyn_cast<Instruction>(InsI)));
 
           FunctionType *CovFuncType = FunctionType::get(Type::getVoidTy(C),
                                                         {Type::getInt32Ty(C)}, false);
           FunctionCallee CovFunc = M.getOrInsertFunction("bc_cov", CovFuncType);
 
-          builder.CreateCall(CovFunc, {builder.getInt32(BBMap[&BB])});              
+          builder.CreateCall(CovFunc, {builder.getInt32(BBMap[&BB])});
+          this->writer.EndObject();
         }
       }
+
+      this->writer.EndArray();
+      this->writer.EndObject();
+
+      // Write the output to a file
+      std::string output = this->s.GetString();
+
+      std::ofstream out(OutputFilename);
+      out << output;
+      out.close();
+
       return true;
     }
 
@@ -130,7 +158,7 @@ namespace
     {
       LLVMContext &C = M.getContext();
       std::map<std::string, std::vector<Function *>> fileFunctionMap;
-      
+
       for (Function &F : M)
       {
         if (F.isDeclaration())
@@ -332,6 +360,41 @@ namespace
       // F.dump();
 
       Builder.CreateCall(CovFunc, {FuncNameStr, FuncNameLen, CastedGlob, NumBBsVal});
+    }
+
+    const DebugLoc &getNearestDebugInfo(llvm::Instruction *I)
+    {
+      /*
+       * This function tries to find the nearest debug information for the given instruction
+       * if it doesn't contain any debug information.
+       */
+      static DebugLoc savedDL;
+
+      const DebugLoc &DL = I->getDebugLoc();
+      if (DL)
+      {
+        if (!savedDL)
+        {
+          savedDL = DL;
+        }
+        return DL;
+      }
+
+      // Get any debug info from the BasicBlock instruction belongs too
+      for (auto &I : *I->getParent())
+      {
+        const DebugLoc &DL = I.getDebugLoc();
+        if (DL)
+        {
+          if (!savedDL)
+          {
+            savedDL = DL;
+          }
+          return DL;
+        }
+      }
+
+      return savedDL;
     }
   };
 } // namespace

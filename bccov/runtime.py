@@ -18,7 +18,7 @@ def link_runtime(
     BITCODE = {"tracepc": "tracepc_runtime.bc", "bbcov": "bbcov_runtime.bc"}
 
     assert all(
-        p.exists() and p.is_file() for p in [input_bitcode, output_bitcode]
+        p.exists() and p.is_file() for p in [input_bitcode]
     ), f"Input files do not exist"
 
     if debug:

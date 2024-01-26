@@ -115,6 +115,23 @@ def tracepc(args: argparse.Namespace):
         args.debug,
         "tracepc",
     )
+    build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
+    parse_cov_info_file(pathlib.Path("/tmp/cov_info.json"), mode="tracepc")
+    create_code_database(args.source_dir)
+
+    for input_file in args.input_dir.glob("*"):
+        if not input_file.is_file():
+            continue
+        run_and_collect_coverage(
+            pathlib.Path("/tmp/final_binary"),
+            pathlib.Path("/tmp/target.bc_cov"),
+            input_file,
+        )
+        parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"), mode="tracepc")
+
+    print_coverage_stats(mode="tracepc")
+    sources = get_function_source(args.function)
+    highlight_lines(args.function, sources, mode="tracepc")
 
 
 def bbcov(args: argparse.Namespace):
@@ -133,7 +150,7 @@ def bbcov(args: argparse.Namespace):
         "bbcov",
     )
     build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
-    parse_cov_info_file(pathlib.Path("/tmp/cov_info.json"))
+    parse_cov_info_file(pathlib.Path("/tmp/cov_info.json"), mode="bbcov")
     create_code_database(args.source_dir)
 
     for input_file in args.input_dir.glob("*"):
@@ -144,8 +161,8 @@ def bbcov(args: argparse.Namespace):
             pathlib.Path("/tmp/target.bc_cov"),
             input_file,
         )
-        parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"))
+        parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"), mode="bbcov")
 
-    print_coverage_stats()
+    print_coverage_stats(mode="bbcov")
     sources = get_function_source(args.function)
     highlight_lines(args.function, sources)
