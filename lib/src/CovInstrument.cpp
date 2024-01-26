@@ -24,6 +24,8 @@ using namespace llvm;
 // Create an option to pass the output file name
 static cl::opt<std::string> OutputFilename("output", cl::desc("Specify output filename"), cl::value_desc("filename"));
 static cl::opt<std::string> SkipList("skiplist", cl::desc("Specify skiplist filename"), cl::value_desc("filename"));
+static cl::opt<bool> BBCountCov("bbcount", cl::desc("Specify if basic block count coverage should be generated"), cl::value_desc("bool"), cl::init(false));
+static cl::opt<bool> TracePC("tracepc", cl::desc("Specify if tracepc coverage should be generated"), cl::value_desc("bool"), cl::init(false));
 
 namespace
 {
@@ -49,14 +51,49 @@ namespace
       return skipList;
     }
 
+    bool VerifyParameters(void)
+    {
+      if (BBCountCov && TracePC)
+      {
+        llvm::errs() << "Cannot specify both bbcount and tracepc\n";
+        return false;
+      } 
+      
+      if (!BBCountCov && !TracePC)
+      {
+        llvm::errs() << "Must specify either bbcount or tracepc\n";
+        return false;
+      }
+    }
+
     bool runOnModule(Module &M) override
     {
+      if (!VerifyParameters())
+      {
+        return false;
+      }
+
       std::vector<std::string> skipList = parseSkipList();
 
-      LLVMContext &C = M.getContext();
-      IntegerType *Int64Ty = Type::getInt64Ty(C);
-      std::map<std::string, std::vector<Function *>> fileFunctionMap;
 
+      if (BBCountCov) {
+        llvm::dbgs() << "Generating basic block count coverage\n";
+        return BBCountCoverage(M, skipList);
+      } else if (TracePC) {
+        llvm::dbgs() << "Generating tracepc coverage\n";
+        return TracePCCoverage(M, skipList);
+      } else {
+        llvm_unreachable("Invalid coverage type");
+      }
+    }
+
+    bool TracePCCoverage(Module &M, std::vector<std::string> skipList)
+    {
+      LLVMContext &C = M.getContext();
+      std::map<std::string, std::vector<Function *>> fileFunctionMap;
+      std::map<BasicBlock *, uint32_t> BBMap;
+
+      uint32_t BBCounter = 0;
       for (Function &F : M)
       {
         if (F.isDeclaration())
@@ -69,9 +106,41 @@ namespace
           continue;
         }
 
+        // Assign a unique basic block id to each basic block
+        for (BasicBlock &BB : F)
+        {
+          BBMap[&BB] = BBCounter++;
+          
+          IRBuilder<> builder(BB);
+
+          FunctionType *CovFuncType = FunctionType::get(Type::getVoidTy(C),
+                                                        {Type::getInt32Ty(C)}, false);
+          FunctionCallee CovFunc = M.getOrInsertFunction("bc_cov", CovFuncType);
+
+          builder.CreateCall(CovFunc, {builder.getInt32(BBMap[&BB])});              
+        }
+      }
+    }
+
+    bool BBCountCoverage(Module &M, std::vector<std::string> skipList)
+    {
+      LLVMContext &C = M.getContext();
+      std::map<std::string, std::vector<Function *>> fileFunctionMap;
+      
+      for (Function &F : M)
+      {
+        if (F.isDeclaration())
+        {
+          continue;
+        }
+
+        if (std::find(skipList.begin(), skipList.end(), F.getName().str()) != skipList.end())
+        {
+          continue;
+        }
         // Create a global array for each function
         unsigned int NumBBs = std::distance(F.begin(), F.end());
-        ArrayType *ArrayTy = ArrayType::get(Int64Ty, NumBBs);
+        ArrayType *ArrayTy = ArrayType::get(Type::getInt64Ty(C), NumBBs);
         std::string counterName = F.getName().str() + "_counters";
         llvm::dbgs() << "Creating Function Array: " << counterName << "\n";
         // GlobalVariable *BBCounters = dyn_cast<GlobalVariable>(M.getOrInsertGlobal(funcName, ArrayTy));

@@ -1,11 +1,17 @@
 
-runtime.bc: runtimelib.c
+bbcov_runtime.bc: bbcov_runtime.c
 	clang -emit-llvm -c -g -O0 -Xclang -disable-O0-optnone -o $@ $<
 
-debugruntime.bc: runtimelib.c
+debugbbcov_runtime.bc: bbcov_runtime.c
 	clang -emit-llvm -c -g -O0 -Xclang -DDEBUG -disable-O0-optnone -o $@ $<
 
-all: runtime.bc debugruntime.bc
+tracepc_runtime.bc: tracepc_runtime.c
+	clang -emit-llvm -c -g -O0 -Xclang -disable-O0-optnone -o $@ $<
+
+debugtracepc_runtime.bc: tracepc_runtime.c
+	clang -emit-llvm -c -g -O0 -Xclang -DDEBUG -disable-O0-optnone -o $@ $<
+
+all: bbcov_runtime.bc debugbbcov_runtime.bc tracepc_runtime.bc debugtracepc_runtime.bc
 
 clean:
-	rm -f runtime.bc debugruntime.bc
+	rm -f bbcov_runtime.bc debugbbcov_runtime.bc tracepc_runtime.bc debugtracepc_runtime.bc

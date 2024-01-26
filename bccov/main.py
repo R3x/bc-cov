@@ -67,8 +67,26 @@ def run_cli():
         type=pathlib.Path,
         default=pathlib.Path(TESTS_DIR / "griller.skip"),
     )
+    parser.add_argument(
+        "--tracepc",
+        help="Enable ordered tracing of basic blocks",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--bbcov",
+        help="Enable profiling-style, thread-safe basic block coverage",
+        action="store_true",
+    )
 
     args = parser.parse_args()
+
+    if not args.tracepc and not args.bbcov:
+        print("No instrumentation selected. Exiting.")
+        exit(1)
+
+    if args.tracepc and args.bbcov:
+        print("Only one instrumentation can be selected. Exiting.")
+        exit(1)
 
     set_config(args.config_file)
     if args.debug:
@@ -76,6 +94,28 @@ def run_cli():
     build_passes()
     build_runtime()
 
+    if args.tracepc:
+        tracepc(args)
+    elif args.bbcov:
+        bbcov(args)
+
+
+def tracepc(args: argparse.Namespace):
+    run_passes(
+        pass_name="CovInstrument",
+        bitcode_file=args.bitcode_file,
+        output_bitcode_file="/tmp/instrumented.bc",
+        output_cov_info_file="/tmp/cov_info.json",
+        skip_file=args.skip_file,
+    )
+    link_runtime(
+        pathlib.Path("/tmp/instrumented.bc"),
+        pathlib.Path("/tmp/final_linked.bc"),
+        args.debug,
+    )
+
+
+def bbcov(args: argparse.Namespace):
     run_passes(
         pass_name="CovInstrument",
         bitcode_file=args.bitcode_file,
