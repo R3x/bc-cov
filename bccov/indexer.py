@@ -6,7 +6,7 @@ import clang.cindex
 
 from bccov.utils import get_logger
 
-logger = get_logger(__name__, "DEBUG")
+logger = get_logger(__name__, "INFO")
 
 sources = namedtuple("sources", ["source", "line", "file_path"])
 

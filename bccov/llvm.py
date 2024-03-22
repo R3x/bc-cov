@@ -6,7 +6,7 @@ from bccov.utils import run_cmd
 
 def build_passes():
     # run build.sh
-    run_cmd("./build.sh", cwd=config.LIB_DIR, verbose=True)
+    run_cmd("./build.sh", cwd=config.LIB_DIR, verbose=False)
 
 
 def run_passes(
@@ -24,7 +24,6 @@ def run_passes(
         skip_flag = f"--skiplist {skip_file}"
     run_cmd(
         f"{config.LLVM_OPT} -f -load {PASS_MAP[pass_name]} -output {output_cov_info_file} {flags} {skip_flag} -cov-instrument --disable-verify < {bitcode_file} > {output_bitcode_file}",
-        verbose=True,
     )
     output_bitcode_file = pathlib.Path(output_bitcode_file)
     assert (

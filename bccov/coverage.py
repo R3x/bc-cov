@@ -2,6 +2,9 @@ from collections import namedtuple
 import json
 import pathlib
 import struct
+import sys
+
+from bccov.utils.pylogger import get_logger
 
 LineDetails = namedtuple("LineDetails", ["file_name", "line_no"])
 CoverageDetails = namedtuple(
@@ -9,11 +12,19 @@ CoverageDetails = namedtuple(
 )
 Function = namedtuple("Function", ["name", "file_name"])
 
+log = get_logger(__name__, "INFO")
+
 
 class TracePCCoverageStats:
     COV_MAP = {}
     ORDER = {}
+    CMP_MAP = {}
     Counter = 0
+    cmp_mode = False
+
+    @staticmethod
+    def set_cmp_mode(mode: bool):
+        TracePCCoverageStats.cmp_mode = mode
 
     @staticmethod
     def init_cov_info(cov_info: dict):
@@ -136,7 +147,7 @@ class BBCovCoverageStats:
         # TODO: not file sensitve
         stats = BBCovCoverageStats.get_function_coverage(function)
         if stats == None:
-            return []
+            return (set(), set(), set())
         covered_lines = set()
         uncovered_lines = set()
         for bb in stats:
@@ -179,6 +190,10 @@ class BBCovCoverageStats:
                     covered += 1
             total = len(func)
             print(f"\t{covered} / {total} : {covered/total}")
+
+
+def enable_comparison_mode():
+    TracePCCoverageStats.set_cmp_mode(True)
 
 
 def read_size(f):
@@ -271,7 +286,7 @@ def parse_bbcov_coverage_file(cov_file: pathlib.Path):
                 cov_array.append(read_uint64(f))
 
             func_map[function_name] = cov_array
-            print(f"{function_name} : {cov_array}")
+            log.debug(f"{function_name} : {cov_array}")
 
         cov_map[file_name] = func_map
 
@@ -287,7 +302,7 @@ def print_coverage_stats(mode="bbcov"):
         raise NotImplementedError
 
 
-def highlight_lines(function: str, sources: str, mode="bbcov"):
+def highlight_lines(function: str, sources: str, mode="bbcov", output_file=""):
     covered, uncovered, intersection = None, None, None
     if mode == "tracepc":
         covered, uncovered, intersection = TracePCCoverageStats.get_lines_covered(
@@ -297,12 +312,17 @@ def highlight_lines(function: str, sources: str, mode="bbcov"):
         covered, uncovered, intersection = BBCovCoverageStats.get_lines_covered(
             function
         )
+
+    fp = sys.stdout
+    if output_file:
+        fp = open(output_file, "w")
+
     for line in sources:
         if line.line in covered:
-            print(f"\033[92m{line.source}\033[0m", end="")
+            fp.write(f"\033[92m{line.source}\033[0m")
         elif line.line in uncovered:
-            print(f"\033[91m{line.source}\033[0m", end="")
+            fp.write(f"\033[91m{line.source}\033[0m")
         elif line.line in intersection:
-            print(f"\033[93m{line.source}\033[0m", end="")
+            fp.write(f"\033[93m{line.source}\033[0m")
         else:
-            print(line.source, end="")
+            fp.write(line.source)

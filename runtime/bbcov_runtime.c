@@ -18,9 +18,9 @@ int done = 0;
 
 void bc_dump_cov();
 void bc_cov_set_signal_handler();
-#ifdef GRILLER
+//#ifdef GRILLER
 void grill_hook_destroy();
-#endif
+//#endif
 void _bc_dump_cov();
 
 __attribute__((constructor)) void bc_init_cov()
@@ -48,6 +48,8 @@ __attribute__((constructor)) void bc_init_cov()
 
   cov_fp = fopen(bc_cov_file, "w");
   bc_cov_set_signal_handler();
+
+  alarm(5);
 }
 
 #define PATHMAX 100
@@ -78,6 +80,10 @@ void bc_cov_set_signal_handler()
 
     sig_action.sa_flags = SA_SIGINFO | SA_ONSTACK;
 
+    if (sigaction(SIGALRM, &sig_action, NULL) != 0)
+    {
+      err(1, "sigaction");
+    }
     if (sigaction(SIGSEGV, &sig_action, NULL) != 0)
     {
       err(1, "sigaction");
@@ -109,9 +115,9 @@ __attribute__((destructor)) void bc_dump_cov()
 {
   if (done == 1) exit(-1);
   done = 1;
-#ifdef GRILLER
+//#ifdef GRILLER
   grill_hook_destroy();
-#endif
+//#endif
   _bc_dump_cov();
   fclose(cov_fp);
   exit(-1);

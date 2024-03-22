@@ -28,6 +28,8 @@ def run_cmd(
         if verbose:
             print(f"STDOUT has {out.stdout.decode('latin-1')}")
             print(f"STDERR has {out.stderr.decode('latin-1')}")
+        logger.debug(f"STDOUT has {out.stdout.decode('latin-1')}")
+        logger.debug(f"STDERR has {out.stderr.decode('latin-1')}")
         return out.stdout.decode("latin-1"), out.stderr.decode("latin-1")
     except subprocess.TimeoutExpired as e:
         logger.error(
