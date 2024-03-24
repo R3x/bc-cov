@@ -10,6 +10,7 @@ from bccov.coverage import (
     parse_cov_info_file,
     parse_coverage_file,
     print_coverage_stats,
+    print_coverage_summary,
 )
 from bccov.indexer import create_code_database, get_function_source
 from bccov.llvm import build_passes, run_passes
@@ -229,6 +230,7 @@ def tracepc(args: argparse.Namespace):
 
     if args.print_stats:
         print_coverage_stats(mode="tracepc")
+    print_coverage_summary("tracepc", args.function)
     sources = get_function_source(args.function)
     highlight_lines(
         args.function, sources, mode="tracepc", output_file=args.output_file
@@ -297,5 +299,6 @@ def bbcov(args: argparse.Namespace):
 
     if args.print_stats:
         print_coverage_stats(mode="bbcov")
+    print_coverage_summary("bbcov", args.function)
     sources = get_function_source(args.function)
     highlight_lines(args.function, sources, mode="bbcov", output_file=args.output_file)

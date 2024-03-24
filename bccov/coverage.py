@@ -191,6 +191,19 @@ class BBCovCoverageStats:
             total = len(func)
             print(f"\t{covered} / {total} : {covered/total}")
 
+    @staticmethod
+    def print_summary(function):
+        for f, func in BBCovCoverageStats.COV_MAP.items():
+            if f.name == function:
+                covered = 0
+                total = 0
+                for bb in func:
+                    if bb.coverage_index > 0:
+                        covered += 1
+                total = len(func)
+                print(f"{f.file_name} | {f.name} : ", end="")
+                print(f"\t{covered} / {total} : {covered/total}")
+
 
 def enable_comparison_mode():
     TracePCCoverageStats.set_cmp_mode(True)
@@ -298,6 +311,15 @@ def print_coverage_stats(mode="bbcov"):
         TracePCCoverageStats.print_stats()
     elif mode == "bbcov":
         BBCovCoverageStats.print_stats()
+    else:
+        raise NotImplementedError
+
+
+def print_coverage_summary(mode="bbcov", function="main"):
+    if mode == "tracepc":
+        pass
+    elif mode == "bbcov":
+        BBCovCoverageStats.print_summary(function)
     else:
         raise NotImplementedError
 
