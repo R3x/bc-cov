@@ -11,6 +11,7 @@ from bccov.coverage import (
     parse_coverage_file,
     print_coverage_stats,
     print_coverage_summary,
+    print_files_covered_by_line,
 )
 from bccov.indexer import create_code_database, get_function_source
 from bccov.llvm import build_passes, run_passes
@@ -102,6 +103,12 @@ def run_cli():
         "-ps",
         "--print-stats",
         help="Print coverage stats",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--line",
+        help="Dump the names of the files that reach the line",
+        type=int,
     )
 
     args = parser.parse_args()
@@ -273,7 +280,11 @@ def bbcov(args: argparse.Namespace):
                 pathlib.Path("/tmp/target.bc_cov"),
                 input_file,
             )
-            parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"), mode="bbcov")
+            parse_coverage_file(
+                pathlib.Path("/tmp/target.bc_cov"),
+                mode="bbcov",
+                original_input=input_file,
+            )
 
         log.info("Trying all queue inputs in AFL input directory")
         for input_file in args.input_dir.glob("default/queue/*"):
@@ -284,7 +295,11 @@ def bbcov(args: argparse.Namespace):
                 pathlib.Path("/tmp/target.bc_cov"),
                 input_file,
             )
-            parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"), mode="bbcov")
+            parse_coverage_file(
+                pathlib.Path("/tmp/target.bc_cov"),
+                mode="bbcov",
+                original_input=input_file,
+            )
     else:
         log.info("Trying all inputs in input directory")
         for input_file in args.input_dir.glob("*"):
@@ -295,7 +310,14 @@ def bbcov(args: argparse.Namespace):
                 pathlib.Path("/tmp/target.bc_cov"),
                 input_file,
             )
-            parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"), mode="bbcov")
+            parse_coverage_file(
+                pathlib.Path("/tmp/target.bc_cov"),
+                mode="bbcov",
+                original_input=input_file,
+            )
+
+    if args.line != 0:
+        print_files_covered_by_line("bbcov", args.function, args.line)
 
     if args.print_stats:
         print_coverage_stats(mode="bbcov")

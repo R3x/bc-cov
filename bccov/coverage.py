@@ -8,7 +8,7 @@ from bccov.utils.pylogger import get_logger
 
 LineDetails = namedtuple("LineDetails", ["file_name", "line_no"])
 CoverageDetails = namedtuple(
-    "CoverageDetails", ["coverage_index", "id", "line_details"]
+    "CoverageDetails", ["coverage_index", "id", "line_details", "files"]
 )
 Function = namedtuple("Function", ["name", "file_name"])
 
@@ -33,7 +33,7 @@ class TracePCCoverageStats:
             linemap = []
             for line_obj in bb_obj["Coverage"]:
                 linemap.append(LineDetails(line_obj["File"], line_obj["Line"]))
-            TracePCCoverageStats.COV_MAP[id] = CoverageDetails(0, id, linemap)
+            TracePCCoverageStats.COV_MAP[id] = CoverageDetails(0, id, linemap, [])
 
     @staticmethod
     def add_cov_map(cov_map, id=None):
@@ -45,7 +45,7 @@ class TracePCCoverageStats:
 
             if TracePCCoverageStats.COV_MAP[bb_id].coverage_index == 0:
                 TracePCCoverageStats.COV_MAP[bb_id] = CoverageDetails(
-                    1, bb_id, TracePCCoverageStats.COV_MAP[bb_id].line_details
+                    1, bb_id, TracePCCoverageStats.COV_MAP[bb_id].line_details, []
                 )
 
         if id == None:
@@ -73,7 +73,7 @@ class TracePCCoverageStats:
         for bb_id, bb in TracePCCoverageStats.COV_MAP.items():
             if bb.coverage_index > 0:
                 for line in bb.line_details:
-                    covered_lines.add(line.line_no)
+                    covered_lines.add(line.line_noline_no)
             else:
                 for line in bb.line_details:
                     uncovered_lines.add(line.line_no)
@@ -97,7 +97,7 @@ class BBCovCoverageStats:
             linemap = []
             for line_obj in bb_obj["Coverage"]:
                 linemap.append(LineDetails(line_obj["File"], line_obj["Line"]))
-            parsed_array.append(CoverageDetails(0, id, linemap))
+            parsed_array.append(CoverageDetails(0, id, linemap, []))
         return parsed_array
 
     @staticmethod
@@ -110,7 +110,7 @@ class BBCovCoverageStats:
                 )
 
     @staticmethod
-    def add_cov_map(cov_map):
+    def add_cov_map(cov_map, cov_file_name):
         for file_name, func_map in cov_map.items():
             for func_name, cov_array in func_map.items():
                 f = Function(name=func_name.decode(), file_name=file_name.decode())
@@ -126,14 +126,17 @@ class BBCovCoverageStats:
                     assert (
                         i == BBCovCoverageStats.COV_MAP[f][i].id
                     ), f"Coverage index mismatch for {f} at index {i}"
-                    BBCovCoverageStats.COV_MAP[f][i] = CoverageDetails(
-                        coverage_index=max(
-                            BBCovCoverageStats.COV_MAP[f][i].coverage_index,
-                            cov_array[i],
-                        ),
-                        id=BBCovCoverageStats.COV_MAP[f][i].id,
-                        line_details=BBCovCoverageStats.COV_MAP[f][i].line_details,
-                    )
+                    if cov_array[i] > 0:
+                        BBCovCoverageStats.COV_MAP[f][i] = CoverageDetails(
+                            coverage_index=max(
+                                BBCovCoverageStats.COV_MAP[f][i].coverage_index,
+                                cov_array[i],
+                            ),
+                            id=BBCovCoverageStats.COV_MAP[f][i].id,
+                            line_details=BBCovCoverageStats.COV_MAP[f][i].line_details,
+                            files=BBCovCoverageStats.COV_MAP[f][i].files
+                            + [cov_file_name],
+                        )
 
     @staticmethod
     def get_function_coverage(name: str):
@@ -141,6 +144,18 @@ class BBCovCoverageStats:
             if f.name == name:
                 return func
         return None
+
+    @staticmethod
+    def get_files_covering_line(function: str, line: int):
+        files = set()
+        for f, func in BBCovCoverageStats.COV_MAP.items():
+            if f.name == function:
+                for bb in func:
+                    if bb.coverage_index > 0:
+                        for line_detail in bb.line_details:
+                            if line_detail.line_no == line:
+                                files.update(bb.files)
+        return files
 
     @staticmethod
     def get_lines_covered(function: str):
@@ -242,7 +257,9 @@ def parse_cov_info_file(cov_info_file: pathlib.Path, mode: str = "tracepc"):
         BBCovCoverageStats.init_cov_info(cov_json)
 
 
-def parse_coverage_file(cov_file: pathlib.Path, mode: str = "tracepc"):
+def parse_coverage_file(
+    cov_file: pathlib.Path, mode: str = "tracepc", original_input: pathlib.Path = None
+):
     assert (
         cov_file.exists() and cov_file.is_file()
     ), f"Coverage file {cov_file} does not exist"
@@ -250,7 +267,7 @@ def parse_coverage_file(cov_file: pathlib.Path, mode: str = "tracepc"):
     if mode == "tracepc":
         parse_tracepc_coverage_file(cov_file)
     elif mode == "bbcov":
-        parse_bbcov_coverage_file(cov_file)
+        parse_bbcov_coverage_file(cov_file, original_input)
     else:
         raise NotImplementedError
 
@@ -270,7 +287,9 @@ def parse_tracepc_coverage_file(cov_file: pathlib.Path):
     TracePCCoverageStats.add_cov_map(bbs)
 
 
-def parse_bbcov_coverage_file(cov_file: pathlib.Path):
+def parse_bbcov_coverage_file(
+    cov_file: pathlib.Path, original_input: pathlib.Path = None
+):
     cov_map = {}
     f = open(cov_file, "rb")
 
@@ -303,7 +322,17 @@ def parse_bbcov_coverage_file(cov_file: pathlib.Path):
 
         cov_map[file_name] = func_map
 
-    BBCovCoverageStats.add_cov_map(cov_map)
+    BBCovCoverageStats.add_cov_map(cov_map, original_input)
+
+
+def print_files_covered_by_line(mode="bbcov", function="main", line=0):
+    if mode == "tracepc":
+        pass
+    elif mode == "bbcov":
+        files = BBCovCoverageStats.get_files_covering_line(function, line)
+        print(files)
+    else:
+        raise NotImplementedError
 
 
 def print_coverage_stats(mode="bbcov"):
