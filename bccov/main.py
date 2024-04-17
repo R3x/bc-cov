@@ -1,6 +1,7 @@
 import argparse
 import os
 import pathlib
+import uuid
 
 from bccov.compile import build_binary
 from bccov.config import TESTS_DIR, set_config
@@ -245,28 +246,29 @@ def tracepc(args: argparse.Namespace):
 
 
 def bbcov(args: argparse.Namespace):
+    id = str(uuid.uuid4())[0:8]
     log.info("Running Instrumentation passes")
     run_passes(
         pass_name="CovInstrument",
         bitcode_file=args.bitcode_file,
-        output_bitcode_file="/tmp/instrumented.bc",
-        output_cov_info_file="/tmp/cov_info.json",
+        output_bitcode_file=f"/tmp/instrumented-{id}.bc",
+        output_cov_info_file=f"/tmp/cov_info-{id}.json",
         skip_file=args.skip_file,
         flags="-bbcount",
     )
 
     log.info("Linking runtime")
     link_runtime(
-        pathlib.Path("/tmp/instrumented.bc"),
-        pathlib.Path("/tmp/final_linked.bc"),
+        pathlib.Path(f"/tmp/instrumented-{id}.bc"),
+        pathlib.Path(f"/tmp/final_linked-{id}.bc"),
         args.debug,
         "bbcov",
     )
 
     log.info("Compiling binary")
-    build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
+    build_binary(f"/tmp/final_linked-{id}.bc", f"/tmp/final_binary-{id}")
     log.info("Parsing coverage info")
-    parse_cov_info_file(pathlib.Path("/tmp/cov_info.json"), mode="bbcov")
+    parse_cov_info_file(pathlib.Path(f"/tmp/cov_info-{id}.json"), mode="bbcov")
     log.info("Creating code database")
     create_code_database(args.source_dir)
 
@@ -276,12 +278,12 @@ def bbcov(args: argparse.Namespace):
             if not input_file.is_file():
                 continue
             run_and_collect_coverage(
-                pathlib.Path("/tmp/final_binary"),
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"/tmp/final_binary-{id}"),
+                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
                 input_file,
             )
             parse_coverage_file(
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
                 mode="bbcov",
                 original_input=input_file,
             )
@@ -291,12 +293,12 @@ def bbcov(args: argparse.Namespace):
             if not input_file.is_file():
                 continue
             run_and_collect_coverage(
-                pathlib.Path("/tmp/final_binary"),
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"/tmp/final_binary-{id}"),
+                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
                 input_file,
             )
             parse_coverage_file(
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
                 mode="bbcov",
                 original_input=input_file,
             )
@@ -306,12 +308,12 @@ def bbcov(args: argparse.Namespace):
             if not input_file.is_file():
                 continue
             run_and_collect_coverage(
-                pathlib.Path("/tmp/final_binary"),
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"/tmp/final_binary-{id}"),
+                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
                 input_file,
             )
             parse_coverage_file(
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
                 mode="bbcov",
                 original_input=input_file,
             )

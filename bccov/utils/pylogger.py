@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 
 from colorlog import ColoredFormatter
 
@@ -34,7 +35,8 @@ def get_logger(name, level=None):
     else:
         l.setLevel(level)
 
-    logs_path = os.path.join("/tmp", "logs")
+    id = str(uuid.uuid4())[0:8]
+    logs_path = os.path.join("/tmp", f"logs-{id}")
     if not os.path.exists(logs_path):
         os.makedirs(logs_path)
 
