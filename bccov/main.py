@@ -16,7 +16,7 @@ from bccov.coverage import (
 )
 from bccov.indexer import create_code_database, get_function_source
 from bccov.llvm import build_passes, run_passes
-from bccov.runtime import build_runtime, link_runtime, run_and_collect_coverage
+from bccov.lruntime import build_runtime, link_runtime, run_and_collect_coverage
 from bccov.utils.pylogger import get_logger, set_global_log_level
 
 log = get_logger(__name__)
