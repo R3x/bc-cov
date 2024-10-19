@@ -368,15 +368,9 @@ namespace
        * This function tries to find the nearest debug information for the given instruction
        * if it doesn't contain any debug information.
        */
-      static DebugLoc savedDL;
-
       const DebugLoc &DL = I->getDebugLoc();
       if (DL)
       {
-        if (!savedDL)
-        {
-          savedDL = DL;
-        }
         return DL;
       }
 
@@ -386,15 +380,25 @@ namespace
         const DebugLoc &DL = I.getDebugLoc();
         if (DL)
         {
-          if (!savedDL)
-          {
-            savedDL = DL;
-          }
           return DL;
         }
       }
 
-      return savedDL;
+      for (auto &BB : *I->getFunction())
+      {
+        for (auto &I : BB)
+        {
+          const DebugLoc &DL = I.getDebugLoc();
+          if (DL)
+          {
+            return DL;
+          }
+        }
+      }
+
+      llvm::errs() << "Unable to find debug information for instruction: " << *I << "\n";
+      llvm::errs() << "Function: " << I->getFunction()->getName() << "\n";
+      llvm_unreachable("No debug information found");
     }
   };
 } // namespace

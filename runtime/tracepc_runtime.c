@@ -129,12 +129,11 @@ __attribute__((destructor)) void bc_dump_cov()
 #ifdef GRILLER
   grill_hook_destroy();
 #endif
-  if (munmap(map, MAX_FILE_SIZE) == -1) {
-      perror("Error unmapping file");
-  }
-
   if (msync(map, MAX_FILE_SIZE, MS_SYNC) == -1) {
       perror("Error syncing file");
+  }
+  if (munmap(map, MAX_FILE_SIZE) == -1) {
+      perror("Error unmapping file");
   }
   close(fd);
   exit(-1);

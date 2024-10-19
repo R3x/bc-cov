@@ -73,7 +73,7 @@ class TracePCCoverageStats:
         for bb_id, bb in TracePCCoverageStats.COV_MAP.items():
             if bb.coverage_index > 0:
                 for line in bb.line_details:
-                    covered_lines.add(line.line_noline_no)
+                    covered_lines.add(line.line_no)
             else:
                 for line in bb.line_details:
                     uncovered_lines.add(line.line_no)

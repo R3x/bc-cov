@@ -3,6 +3,7 @@ from collections import namedtuple
 import os
 
 import clang.cindex
+from clang.cindex import Config
 
 from bccov.utils import get_logger
 
@@ -13,6 +14,7 @@ sources = namedtuple("sources", ["source", "line", "file_path"])
 
 class CodebaseAnalyzer:
     def __init__(self, codebase_path):
+        Config.set_library_path('/home/r3x/llvm10/llvm-10.0.0.obj/lib')
         self.index = clang.cindex.Index.create()
         self.cache = {}  # Cache to store indexes and extracted data for each file
         self.codebase_path = codebase_path

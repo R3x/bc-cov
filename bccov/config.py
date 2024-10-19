@@ -7,6 +7,7 @@ LLVM_LINK = "llvm-link"
 RUNTIME_DIR = None
 LIB_DIR = None
 
+CWD = None
 
 def get_function_file_path():
     # Return the absolute path of the file containing this function
@@ -38,3 +39,9 @@ def set_config(path_to_config: pathlib.Path):
             raise Exception(
                 f"Config file {path_to_config} is not a valid JSON file"
             ) from e
+
+
+def set_cwd(cwd: pathlib.Path):
+    global CWD
+    print(f"Setting CWD to {cwd}")
+    CWD = cwd

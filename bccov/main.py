@@ -21,6 +21,7 @@ from bccov.utils.pylogger import get_logger, set_global_log_level
 
 log = get_logger(__name__)
 
+CWD=None
 
 def run_cli():
     parser = argparse.ArgumentParser(
@@ -77,6 +78,12 @@ def run_cli():
         "--tracepc",
         help="Enable ordered tracing of basic blocks",
         action="store_true",
+    )
+    parser.add_argument(
+        "--cflags",
+        help="Flags to pass to the compiler",
+        type=str,
+        default="",
     )
     parser.add_argument(
         "--bbcov",
@@ -148,57 +155,61 @@ def compare_compilers(args: argparse.Namespace):
     run_passes(
         pass_name="CovInstrument",
         bitcode_file=args.bitcode_file,
-        output_bitcode_file="/tmp/instrumented.bc",
-        output_cov_info_file="/tmp/cov_info.json",
+        output_bitcode_file=f"{CWD}/instrumented.bc",
+        output_cov_info_file=f"{CWD}/cov_info.json",
         skip_file=args.skip_file,
         flags="-tracepc",
     )
     link_runtime(
-        pathlib.Path("/tmp/instrumented.bc"),
-        pathlib.Path("/tmp/final_linked.bc"),
+        pathlib.Path(f"{CWD}/instrumented.bc"),
+        pathlib.Path(f"{CWD}/final_linked.bc"),
         args.debug,
         "tracepc",
     )
 
     enable_comparison_mode()
-    parse_cov_info_file(pathlib.Path("/tmp/cov_info.json"), mode="tracepc")
+    parse_cov_info_file(pathlib.Path(f"{CWD}/cov_info.json"), mode="tracepc")
     create_code_database(args.source_dir)
     for cid, compiler in enumerate(COMPILERS):
-        build_binary("/tmp/final_linked.bc", f"/tmp/bin{cid}", compiler)
+        build_binary(f"{CWD}/final_linked.bc", f"{CWD}/bin{cid}", compiler)
 
     for input_file in args.input_dir.glob("*"):
         if not input_file.is_file():
             continue
         for cid, compiler in enumerate(COMPILERS):
             run_and_collect_coverage(
-                pathlib.Path(f"/tmp/bin{cid}"),
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"{CWD}/bin{cid}"),
+                pathlib.Path(f"{CWD}/target.bc_cov"),
                 input_file,
             )
-            parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"), mode="tracepc")
+            parse_coverage_file(pathlib.Path(f"{CWD}/target.bc_cov"), mode="tracepc")
 
 
 def tracepc(args: argparse.Namespace):
     log.info("Running Instrumentation passes")
+    global CWD
+    
+    CWD = args.cwd
+    
     run_passes(
         pass_name="CovInstrument",
         bitcode_file=args.bitcode_file,
-        output_bitcode_file="/tmp/instrumented.bc",
-        output_cov_info_file="/tmp/cov_info.json",
+        output_bitcode_file=f"{CWD}/instrumented.bc",
+        output_cov_info_file=f"{CWD}/cov_info.json",
         skip_file=args.skip_file,
         flags="-tracepc",
     )
     log.info("Linking runtime")
     link_runtime(
-        pathlib.Path("/tmp/instrumented.bc"),
-        pathlib.Path("/tmp/final_linked.bc"),
+        pathlib.Path(f"{CWD}/instrumented.bc"),
+        pathlib.Path(f"{CWD}/final_linked.bc"),
         args.debug,
         "tracepc",
     )
     log.info("Compiling binary")
-    build_binary("/tmp/final_linked.bc", "/tmp/final_binary")
+    build_binary(f"{CWD}/final_linked.bc", f"{CWD}/final_binary", cflags=args.cflags)
     log.info("Parsing coverage info")
-    parse_cov_info_file(pathlib.Path("/tmp/cov_info.json"), mode="tracepc")
+    parse_cov_info_file(pathlib.Path(f"{CWD}/cov_info.json"), mode="tracepc")
     log.info("Creating code database")
     create_code_database(args.source_dir)
 
@@ -208,33 +219,46 @@ def tracepc(args: argparse.Namespace):
             if not input_file.is_file():
                 continue
             run_and_collect_coverage(
-                pathlib.Path("/tmp/final_binary"),
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"{CWD}/final_binary"),
+                pathlib.Path(f"{CWD}/target.bc_cov"),
                 input_file,
             )
-            parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"), mode="tracepc")
+            parse_coverage_file(pathlib.Path(f"{CWD}/target.bc_cov"), mode="tracepc")
 
         log.info("Trying all queue inputs in AFL input directory")
         for input_file in args.input_dir.glob("default/queue/*"):
             if not input_file.is_file():
                 continue
             run_and_collect_coverage(
-                pathlib.Path("/tmp/final_binary"),
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"{CWD}/final_binary"),
+                pathlib.Path(f"{CWD}/target.bc_cov"),
                 input_file,
             )
-            parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"), mode="tracepc")
+            parse_coverage_file(pathlib.Path(f"{CWD}/target.bc_cov"), mode="tracepc")
     else:
         log.info("Trying all inputs in input directory")
         for input_file in args.input_dir.glob("*"):
             if not input_file.is_file():
                 continue
             run_and_collect_coverage(
-                pathlib.Path("/tmp/final_binary"),
-                pathlib.Path("/tmp/target.bc_cov"),
+                pathlib.Path(f"{CWD}/final_binary"),
+                pathlib.Path(f"{CWD}/target.bc_cov"),
                 input_file,
             )
-            parse_coverage_file(pathlib.Path("/tmp/target.bc_cov"), mode="tracepc")
+            parse_coverage_file(pathlib.Path(f"{CWD}/target.bc_cov"), mode="tracepc")
+
+        for crashing_dir in args.crashes_dir.glob("*"):
+            if not crashing_dir.is_dir():
+                continue
+            for crashing_file in crashing_dir.glob("*"):
+                if not crashing_file.is_file():
+                    continue
+                run_and_collect_coverage(
+                    pathlib.Path(f"{CWD}/final_binary"),
+                    pathlib.Path(f"{CWD}/target.bc_cov"),
+                    crashing_file,
+                )
+                parse_coverage_file(pathlib.Path(f"{CWD}/target.bc_cov"), mode="tracepc")
 
     if args.print_stats:
         print_coverage_stats(mode="tracepc")
@@ -246,29 +270,33 @@ def tracepc(args: argparse.Namespace):
 
 
 def bbcov(args: argparse.Namespace):
+    global CWD
+    
+    CWD = args.cwd
+    
     id = str(uuid.uuid4())[0:8]
     log.info("Running Instrumentation passes")
     run_passes(
         pass_name="CovInstrument",
         bitcode_file=args.bitcode_file,
-        output_bitcode_file=f"/tmp/instrumented-{id}.bc",
-        output_cov_info_file=f"/tmp/cov_info-{id}.json",
+        output_bitcode_file=f"{CWD}/instrumented-{id}.bc",
+        output_cov_info_file=f"{CWD}/cov_info-{id}.json",
         skip_file=args.skip_file,
         flags="-bbcount",
     )
 
     log.info("Linking runtime")
     link_runtime(
-        pathlib.Path(f"/tmp/instrumented-{id}.bc"),
-        pathlib.Path(f"/tmp/final_linked-{id}.bc"),
+        pathlib.Path(f"{CWD}/instrumented-{id}.bc"),
+        pathlib.Path(f"{CWD}/final_linked-{id}.bc"),
         args.debug,
         "bbcov",
     )
 
     log.info("Compiling binary")
-    build_binary(f"/tmp/final_linked-{id}.bc", f"/tmp/final_binary-{id}")
+    build_binary(f"{CWD}/final_linked-{id}.bc", f"{CWD}/final_binary-{id}")
     log.info("Parsing coverage info")
-    parse_cov_info_file(pathlib.Path(f"/tmp/cov_info-{id}.json"), mode="bbcov")
+    parse_cov_info_file(pathlib.Path(f"{CWD}/cov_info-{id}.json"), mode="bbcov")
     log.info("Creating code database")
     create_code_database(args.source_dir)
 
@@ -278,12 +306,12 @@ def bbcov(args: argparse.Namespace):
             if not input_file.is_file():
                 continue
             run_and_collect_coverage(
-                pathlib.Path(f"/tmp/final_binary-{id}"),
-                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
+                pathlib.Path(f"{CWD}/final_binary-{id}"),
+                pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
                 input_file,
             )
             parse_coverage_file(
-                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
+                pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
                 mode="bbcov",
                 original_input=input_file,
             )
@@ -293,12 +321,12 @@ def bbcov(args: argparse.Namespace):
             if not input_file.is_file():
                 continue
             run_and_collect_coverage(
-                pathlib.Path(f"/tmp/final_binary-{id}"),
-                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
+                pathlib.Path(f"{CWD}/final_binary-{id}"),
+                pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
                 input_file,
             )
             parse_coverage_file(
-                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
+                pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
                 mode="bbcov",
                 original_input=input_file,
             )
@@ -308,15 +336,32 @@ def bbcov(args: argparse.Namespace):
             if not input_file.is_file():
                 continue
             run_and_collect_coverage(
-                pathlib.Path(f"/tmp/final_binary-{id}"),
-                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
+                pathlib.Path(f"{CWD}/final_binary-{id}"),
+                pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
                 input_file,
             )
             parse_coverage_file(
-                pathlib.Path(f"/tmp/target-{id}.bc_cov"),
+                pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
                 mode="bbcov",
                 original_input=input_file,
             )
+            
+        for crashing_dir in args.crashes_dir.glob("*"):
+            if not crashing_dir.is_dir():
+                continue
+            for crashing_file in crashing_dir.glob("*"):
+                if not crashing_file.is_file():
+                    continue
+                run_and_collect_coverage(
+                    pathlib.Path(f"{CWD}/final_binary-{id}"),
+                    pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+                    crashing_file,
+                )
+                parse_coverage_file(
+                    pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+                    mode="bbcov",
+                    original_input=crashing_file,
+                )
 
     if args.line != 0:
         print_files_covered_by_line("bbcov", args.function, args.line)
