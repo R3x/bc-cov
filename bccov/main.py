@@ -120,6 +120,9 @@ def run_cli():
     )
 
     args = parser.parse_args()
+    args.cwd = os.getcwd()
+    args.cflags = os.getenv("CFLAGS")
+    print("CFLAGS: ", args.cflags)
     if not args.tracepc and not args.bbcov:
         print("No instrumentation selected. Exiting.")
         exit(1)
@@ -294,7 +297,7 @@ def bbcov(args: argparse.Namespace):
     )
 
     log.info("Compiling binary")
-    build_binary(f"{CWD}/final_linked-{id}.bc", f"{CWD}/final_binary-{id}")
+    build_binary(f"{CWD}/final_linked-{id}.bc", f"{CWD}/final_binary-{id}", cflags=args.cflags)
     log.info("Parsing coverage info")
     parse_cov_info_file(pathlib.Path(f"{CWD}/cov_info-{id}.json"), mode="bbcov")
     log.info("Creating code database")
