@@ -349,22 +349,22 @@ def bbcov(args: argparse.Namespace):
                 original_input=input_file,
             )
             
-        for crashing_dir in args.crashes_dir.glob("*"):
-            if not crashing_dir.is_dir():
-                continue
-            for crashing_file in crashing_dir.glob("*"):
-                if not crashing_file.is_file():
-                    continue
-                run_and_collect_coverage(
-                    pathlib.Path(f"{CWD}/final_binary-{id}"),
-                    pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
-                    crashing_file,
-                )
-                parse_coverage_file(
-                    pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
-                    mode="bbcov",
-                    original_input=crashing_file,
-                )
+        # for crashing_dir in args.crashes_dir.glob("*"):
+        #     if not crashing_dir.is_dir():
+        #         continue
+        #     for crashing_file in crashing_dir.glob("*"):
+        #         if not crashing_file.is_file():
+        #             continue
+        #         run_and_collect_coverage(
+        #             pathlib.Path(f"{CWD}/final_binary-{id}"),
+        #             pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+        #             crashing_file,
+        #         )
+        #         parse_coverage_file(
+        #             pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+        #             mode="bbcov",
+        #             original_input=crashing_file,
+        #         )
 
     if args.line != 0:
         print_files_covered_by_line("bbcov", args.function, args.line)

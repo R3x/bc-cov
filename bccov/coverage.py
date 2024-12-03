@@ -348,6 +348,9 @@ def print_coverage_summary(mode="bbcov", function="main"):
     if mode == "tracepc":
         pass
     elif mode == "bbcov":
+        if function == "main":
+            log.warning("SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix")
+            function = "old_main_grill"
         BBCovCoverageStats.print_summary(function)
     else:
         raise NotImplementedError
@@ -356,10 +359,16 @@ def print_coverage_summary(mode="bbcov", function="main"):
 def highlight_lines(function: str, sources: str, mode="bbcov", output_file=""):
     covered, uncovered, intersection = None, None, None
     if mode == "tracepc":
+        if function == "main":
+            log.warning("SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix")
+            function = "old_main_grill"
         covered, uncovered, intersection = TracePCCoverageStats.get_lines_covered(
             function
         )
     else:
+        if function == "main":
+            log.warning("SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix")
+            function = "old_main_grill"
         covered, uncovered, intersection = BBCovCoverageStats.get_lines_covered(
             function
         )
