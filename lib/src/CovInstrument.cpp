@@ -109,11 +109,13 @@ namespace
       {
         if (F.isDeclaration())
         {
+          llvm::dbgs() << "Skipping function (isDeclaration): " << F.getName() << "\n";
           continue;
         }
 
         if (std::find(skipList.begin(), skipList.end(), F.getName().str()) != skipList.end())
         {
+          llvm::dbgs() << "Skipping function (skipList): " << F.getName() << "\n";
           continue;
         }
         
