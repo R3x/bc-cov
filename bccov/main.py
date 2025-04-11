@@ -6,6 +6,7 @@ import uuid
 from bccov.compile import build_binary
 from bccov.config import TESTS_DIR, set_config
 from bccov.coverage import (
+    dump_coverage_info,
     enable_comparison_mode,
     highlight_lines,
     parse_cov_info_file,
@@ -118,6 +119,16 @@ def run_cli():
         help="Dump the names of the files that reach the line",
         type=int,
     )
+    parser.add_argument(
+        "--reuse-cache",
+        help="Reuse the cache",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--interactive",
+        help="Enable interactive mode",
+        action="store_true",
+    )
 
     args = parser.parse_args()
     args.cwd = os.getcwd()
@@ -139,8 +150,12 @@ def run_cli():
     set_config(args.config_file)
     if args.debug:
         set_global_log_level("DEBUG")
-    build_passes()
-    build_runtime()
+    
+    if args.reuse_cache:
+        log.info("Reusing cache")
+    else:
+        build_passes()
+        build_runtime()
 
     if args.compare_compilers_mode:
         compare_compilers(args)
@@ -265,11 +280,25 @@ def tracepc(args: argparse.Namespace):
 
     if args.print_stats:
         print_coverage_stats(mode="tracepc")
-    print_coverage_summary("tracepc", args.function)
-    sources = get_function_source(args.function)
-    highlight_lines(
-        args.function, sources, mode="tracepc", output_file=args.output_file
-    )
+
+    if args.interactive:
+        while True:
+            print("-" * 80)
+            function_name = input("Enter function name (Type 'exit' to exit): ")
+            if function_name == "exit":
+                break
+            print_coverage_summary("tracepc", function_name)
+            sources = get_function_source(function_name)        
+            highlight_lines(
+                function_name, sources, mode="tracepc", output_file=args.output_file
+            )
+            print("-" * 80)
+    else:
+        print_coverage_summary("tracepc", args.function)
+        sources = get_function_source(args.function)
+        highlight_lines(
+            args.function, sources, mode="tracepc", output_file=args.output_file
+        )
 
 
 def bbcov(args: argparse.Namespace):
@@ -303,11 +332,14 @@ def bbcov(args: argparse.Namespace):
     log.info("Creating code database")
     create_code_database(args.source_dir)
 
+    tried_files = []
+
     if args.afl:
         log.info("Trying all crashes in AFL input directory")
         for input_file in args.input_dir.glob("default/crashes/*"):
             if not input_file.is_file():
                 continue
+            tried_files.append(input_file)
             run_and_collect_coverage(
                 pathlib.Path(f"{CWD}/final_binary-{id}"),
                 pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
@@ -319,10 +351,14 @@ def bbcov(args: argparse.Namespace):
                 original_input=input_file,
             )
 
+        curr_tried = len(tried_files)
+        log.info(f"Tried {curr_tried} files from AFL Crashes : {str(args.input_dir)}")
+
         log.info("Trying all queue inputs in AFL input directory")
         for input_file in args.input_dir.glob("default/queue/*"):
             if not input_file.is_file():
                 continue
+            tried_files.append(input_file)
             run_and_collect_coverage(
                 pathlib.Path(f"{CWD}/final_binary-{id}"),
                 pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
@@ -333,11 +369,14 @@ def bbcov(args: argparse.Namespace):
                 mode="bbcov",
                 original_input=input_file,
             )
+        curr_tried = len(tried_files) - curr_tried
+        log.info(f"Tried {curr_tried} files from AFL Queeue : {str(args.input_dir)}")
     else:
         log.info("Trying all inputs in input directory")
         for input_file in args.input_dir.glob("*"):
             if not input_file.is_file():
                 continue
+            tried_files.append(input_file)
             run_and_collect_coverage(
                 pathlib.Path(f"{CWD}/final_binary-{id}"),
                 pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
@@ -348,7 +387,9 @@ def bbcov(args: argparse.Namespace):
                 mode="bbcov",
                 original_input=input_file,
             )
-            
+
+        log.info(f"Tried {len(tried_files)} files from input directory : {str(args.input_dir)}")
+
         # for crashing_dir in args.crashes_dir.glob("*"):
         #     if not crashing_dir.is_dir():
         #         continue
@@ -371,6 +412,88 @@ def bbcov(args: argparse.Namespace):
 
     if args.print_stats:
         print_coverage_stats(mode="bbcov")
-    print_coverage_summary("bbcov", args.function)
-    sources = get_function_source(args.function)
-    highlight_lines(args.function, sources, mode="bbcov", output_file=args.output_file)
+
+    if args.interactive:
+        while True:
+            print("-" * 80)
+            function_name = input("Enter function name (Type 'exit' to exit, 'new inputs' to try new inputs): ")
+            function_name = function_name.strip()
+            if function_name == "exit":
+                break
+            if function_name == "new inputs":
+                if args.afl:
+                    for input_file in args.input_dir.glob("default/crashes/*"):
+                        if not input_file.is_file():
+                            continue
+                        if input_file in tried_files:
+                            continue
+                        tried_files.append(input_file)
+                        run_and_collect_coverage(
+                            pathlib.Path(f"{CWD}/final_binary-{id}"),
+                            pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+                            input_file,
+                        )
+                        parse_coverage_file(
+                            pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+                            mode="bbcov",
+                            original_input=input_file,
+                        )
+                    for input_file in args.input_dir.glob("default/queue/*"):
+                        if not input_file.is_file():
+                            continue
+                        if input_file in tried_files:
+                            continue
+                        tried_files.append(input_file)
+                        run_and_collect_coverage(
+                            pathlib.Path(f"{CWD}/final_binary-{id}"),
+                            pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+                            input_file,
+                        )
+                        parse_coverage_file(
+                            pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+                            mode="bbcov",
+                            original_input=input_file,
+                        )
+                else:
+                    for input_file in args.input_dir.glob("*"):
+                        if not input_file.is_file():
+                            continue
+                        if input_file in tried_files:
+                            continue
+                        tried_files.append(input_file)
+                        run_and_collect_coverage(
+                            pathlib.Path(f"{CWD}/final_binary-{id}"),
+                            pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+                            input_file,
+                        )
+                        parse_coverage_file(
+                            pathlib.Path(f"{CWD}/target-{id}.bc_cov"),
+                            mode="bbcov",
+                            original_input=input_file,
+                        )
+                continue
+           
+            try:
+                print_coverage_summary("bbcov", function_name)
+                sources = get_function_source(function_name)
+                highlight_lines(
+                    function_name, sources, mode="bbcov", output_file=args.output_file
+                )
+                print("-" * 80)
+            except Exception as e:
+                log.error(e)
+                print("Function not found. Try again.")
+    else:
+        file_name = print_coverage_summary("bbcov", args.function)
+        sources = get_function_source(
+            args.function,
+            file_name,
+            output_mode=True if args.output_file else False
+        )
+        highlight_lines(args.function, sources, mode="bbcov", output_file="")
+        
+    if args.output_file:
+        print(f"Output written to {args.output_file}")
+        dump_coverage_info(mode="bbcov", output_file=args.output_file)
+        
+        

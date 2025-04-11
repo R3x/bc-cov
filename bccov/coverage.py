@@ -102,6 +102,7 @@ class BBCovCoverageStats:
 
     @staticmethod
     def init_cov_info(cov_info: dict):
+        BBCovCoverageStats.COV_MAP = {}
         for file_name, func_map in cov_info.items():
             for func_obj in func_map:
                 f = Function(name=func_obj["Function"], file_name=file_name)
@@ -182,6 +183,38 @@ class BBCovCoverageStats:
     @staticmethod
     def get_cov_map():
         return BBCovCoverageStats.COV_MAP
+
+    @staticmethod
+    def get_json_cov_map():
+        SKIP_FILES = [
+            "instrumentation_helpers/complex_types.c",
+            "instrumentation_helpers/helper.c",
+            "instrumentation_helpers/hooks.c",
+            "instrumentation_helpers/list.c"
+        ]
+        
+        # convert to json serializable format
+        cov_map = {}
+        for f, func in BBCovCoverageStats.COV_MAP.items():
+            if f.file_name in SKIP_FILES:
+                continue
+            
+            if f.file_name not in cov_map:
+                cov_map[f.file_name] = {}
+            
+            cov_map[f.file_name][f.name] = []
+            for bb in func:
+                cov_map[f.file_name][f.name].append(
+                    {
+                        "Id": bb.id,
+                        "CovInfo" : [
+                            {"File": line.file_name, "Line": line.line_no}
+                            for line in bb.line_details   
+                        ],
+                        "CovIndex" : bb.coverage_index
+                    }
+                )
+        return cov_map        
 
     @staticmethod
     def print_cov_map():
@@ -290,6 +323,7 @@ def parse_tracepc_coverage_file(cov_file: pathlib.Path):
 def parse_bbcov_coverage_file(
     cov_file: pathlib.Path, original_input: pathlib.Path = None
 ):
+    
     cov_map = {}
     f = open(cov_file, "rb")
 
@@ -343,18 +377,32 @@ def print_coverage_stats(mode="bbcov"):
     else:
         raise NotImplementedError
 
+def get_file_name(function : str):
+    for f, func in BBCovCoverageStats.COV_MAP.items():
+        if f.name == function:
+            return f.file_name
+    return None
 
 def print_coverage_summary(mode="bbcov", function="main"):
     if mode == "tracepc":
-        pass
+        raise NotImplementedError
     elif mode == "bbcov":
         if function == "main":
             log.warning("SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix")
             function = "old_main_grill"
-        BBCovCoverageStats.print_summary(function)
+        BBCovCoverageStats.print_summary(function)        
+        return get_file_name(function)
     else:
         raise NotImplementedError
 
+def dump_coverage_info(mode="bbcov", output_file=""):
+    if mode == "tracepc":
+        raise NotImplementedError
+    elif mode == "bbcov":
+        with open(output_file, "w") as f:
+            f.write(json.dumps(BBCovCoverageStats.get_json_cov_map(), indent=4))
+    else:
+        raise NotImplementedError
 
 def highlight_lines(function: str, sources: str, mode="bbcov", output_file=""):
     covered, uncovered, intersection = None, None, None
@@ -376,6 +424,10 @@ def highlight_lines(function: str, sources: str, mode="bbcov", output_file=""):
     fp = sys.stdout
     if output_file:
         fp = open(output_file, "w")
+
+    if sources == None:
+        print("NO SOURCES")
+        return 
 
     for line in sources:
         if line.line in covered:
