@@ -34,9 +34,8 @@ def link_runtime(
 def run_and_collect_coverage(
     input_binary: pathlib.Path, output_file: pathlib.Path, input_file: pathlib.Path
 ):
-
-    assert all(
-        p.exists() and p.is_file() for p in [input_binary, input_file]
-    ), f"Input files do not exist"
+    # Check if the input files exist
+    assert input_binary.exists() and input_binary.is_file(), f"Input binary does not exist"
+    assert input_file.exists() and input_file.is_file(), f"Input file does not exist"
 
     run_cmd(f"BC_COV_FILE={output_file} {input_binary} < {input_file}")

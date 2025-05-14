@@ -83,3 +83,16 @@ def run_bbcov_cov(bitcode_file, dirs, source_dir, target_function, cflags, outpu
     args.afl = afl_mode
     args.output_file = output_file
     bbcov(args)
+
+def run_highlight_from_dumped_covinfo(covinfo_file, source_dir, target_function, output_file=None):
+    from bccov.coverage import load_dumped_json_cov_map, print_coverage_summary, get_function_source, highlight_lines
+    from bccov.indexer import create_code_database, get_function_source
+    load_dumped_json_cov_map(covinfo_file)
+    create_code_database(source_dir)
+    file_name = print_coverage_summary("bbcov", target_function)
+    sources = get_function_source(
+        target_function,
+        file_name,
+        output_mode=True if output_file else False
+    )
+    highlight_lines(target_function, sources, mode="bbcov", output_file=output_file or "")

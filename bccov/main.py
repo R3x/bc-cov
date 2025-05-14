@@ -33,14 +33,12 @@ def run_cli():
         "--bitcode_file",
         help="Path to the bitcode file",
         type=pathlib.Path,
-        required=True,
     )
     parser.add_argument(
         "-i",
         "--input_dir",
         help="Path to the directory containing input files",
         type=pathlib.Path,
-        required=True,
     )
     parser.add_argument(
         "-s",
@@ -129,11 +127,37 @@ def run_cli():
         help="Enable interactive mode",
         action="store_true",
     )
+    parser.add_argument(
+        "--load-cov-info",
+        help="Load coverage info from a dumped file (from get_json_cov_map) and print highlighted source",
+        type=pathlib.Path,
+    )
 
     args = parser.parse_args()
     args.cwd = os.getcwd()
     args.cflags = os.getenv("CFLAGS")
     print("CFLAGS: ", args.cflags)
+
+    if args.load_cov_info:
+        from bccov.coverage import load_dumped_json_cov_map, print_coverage_summary, get_file_name, highlight_lines
+        from bccov.indexer import create_code_database, get_function_source
+        load_dumped_json_cov_map(args.load_cov_info)
+        create_code_database(args.source_dir)
+        file_name = print_coverage_summary("bbcov", args.function)
+        sources = get_function_source(
+            args.function,
+            file_name,
+            output_mode=True if args.output_file else False
+        )
+        highlight_lines(args.function, sources, mode="bbcov", output_file=args.output_file or "")
+        if args.output_file:
+            print(f"Output written to {args.output_file}")
+        return
+
+    if not args.bitcode_file or not args.input_dir:
+        print("Bitcode file and input directory are required. Exiting.")
+        exit(1)
+
     if not args.tracepc and not args.bbcov:
         print("No instrumentation selected. Exiting.")
         exit(1)
@@ -146,7 +170,6 @@ def run_cli():
         if args.bbcov:
             print("Comparison mode not supported for bbcov. Exiting.")
             exit(1)
-
     set_config(args.config_file)
     if args.debug:
         set_global_log_level("DEBUG")
@@ -495,5 +518,5 @@ def bbcov(args: argparse.Namespace):
     if args.output_file:
         print(f"Output written to {args.output_file}")
         dump_coverage_info(mode="bbcov", output_file=args.output_file)
-        
-        
+
+

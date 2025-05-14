@@ -438,3 +438,25 @@ def highlight_lines(function: str, sources: str, mode="bbcov", output_file=""):
             fp.write(f"\033[93m{line.source}\033[0m")
         else:
             fp.write(line.source)
+
+def load_dumped_json_cov_map(json_file):
+    """
+    Loads coverage info from a dumped JSON file (from get_json_cov_map)
+    and populates BBCovCoverageStats.COV_MAP.
+    """
+    with open(json_file, "r") as f:
+        cov_json = json.load(f)
+    BBCovCoverageStats.COV_MAP = {}
+    for file_name, func_map in cov_json.items():
+        for func_name, bb_list in func_map.items():
+            fkey = Function(name=func_name, file_name=file_name)
+            bb_objs = []
+            for bb in bb_list:
+                id = bb["Id"]
+                linemap = [
+                    LineDetails(line_obj["File"], line_obj["Line"])
+                    for line_obj in bb["CovInfo"]
+                ]
+                covidx = bb.get("CovIndex", 0)
+                bb_objs.append(CoverageDetails(covidx, id, linemap, []))
+            BBCovCoverageStats.COV_MAP[fkey] = bb_objs
