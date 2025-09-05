@@ -1,8 +1,8 @@
-from collections import namedtuple
 import json
 import pathlib
 import struct
 import sys
+from collections import namedtuple
 
 from bccov.utils.pylogger import get_logger
 
@@ -37,7 +37,6 @@ class TracePCCoverageStats:
 
     @staticmethod
     def add_cov_map(cov_map, id=None):
-
         for bb_id in cov_map:
             assert (
                 bb_id in TracePCCoverageStats.COV_MAP
@@ -56,7 +55,6 @@ class TracePCCoverageStats:
 
     @staticmethod
     def print_stats():
-
         # find total unique basic block ids
         all_ids = set()
         for id, bb_ids in TracePCCoverageStats.ORDER.items():
@@ -128,6 +126,10 @@ class BBCovCoverageStats:
                         i == BBCovCoverageStats.COV_MAP[f][i].id
                     ), f"Coverage index mismatch for {f} at index {i}"
                     if cov_array[i] > 0:
+                        # Only add to files list if cov_file_name is provided
+                        files_to_add = (
+                            [cov_file_name] if cov_file_name is not None else []
+                        )
                         BBCovCoverageStats.COV_MAP[f][i] = CoverageDetails(
                             coverage_index=max(
                                 BBCovCoverageStats.COV_MAP[f][i].coverage_index,
@@ -135,8 +137,7 @@ class BBCovCoverageStats:
                             ),
                             id=BBCovCoverageStats.COV_MAP[f][i].id,
                             line_details=BBCovCoverageStats.COV_MAP[f][i].line_details,
-                            files=BBCovCoverageStats.COV_MAP[f][i].files
-                            + [cov_file_name],
+                            files=BBCovCoverageStats.COV_MAP[f][i].files + files_to_add,
                         )
 
     @staticmethod
@@ -190,31 +191,32 @@ class BBCovCoverageStats:
             "instrumentation_helpers/complex_types.c",
             "instrumentation_helpers/helper.c",
             "instrumentation_helpers/hooks.c",
-            "instrumentation_helpers/list.c"
+            "instrumentation_helpers/list.c",
         ]
-        
+
         # convert to json serializable format
         cov_map = {}
         for f, func in BBCovCoverageStats.COV_MAP.items():
             if f.file_name in SKIP_FILES:
                 continue
-            
+
             if f.file_name not in cov_map:
                 cov_map[f.file_name] = {}
-            
+
             cov_map[f.file_name][f.name] = []
             for bb in func:
                 cov_map[f.file_name][f.name].append(
                     {
                         "Id": bb.id,
-                        "CovInfo" : [
+                        "CovInfo": [
                             {"File": line.file_name, "Line": line.line_no}
-                            for line in bb.line_details   
+                            for line in bb.line_details
                         ],
-                        "CovIndex" : bb.coverage_index
+                        "CovIndex": bb.coverage_index,
+                        "InputFiles": [str(f) for f in bb.files] if bb.files else [],
                     }
                 )
-        return cov_map        
+        return cov_map
 
     @staticmethod
     def print_cov_map():
@@ -323,7 +325,6 @@ def parse_tracepc_coverage_file(cov_file: pathlib.Path):
 def parse_bbcov_coverage_file(
     cov_file: pathlib.Path, original_input: pathlib.Path = None
 ):
-    
     cov_map = {}
     f = open(cov_file, "rb")
 
@@ -359,12 +360,78 @@ def parse_bbcov_coverage_file(
     BBCovCoverageStats.add_cov_map(cov_map, original_input)
 
 
-def print_files_covered_by_line(mode="bbcov", function="main", line=0):
+def print_files_covered_by_line(mode="bbcov", function="main", line=0, verbose=False):
     if mode == "tracepc":
         pass
     elif mode == "bbcov":
         files = BBCovCoverageStats.get_files_covering_line(function, line)
-        print(files)
+
+        if not files:
+            print(f"No input files reached line {line} in function '{function}'")
+            return
+
+        print(f"Input files that reached line {line} in function '{function}':")
+        print(f"{'='*60}")
+
+        # Group files by type (crashes vs queue vs other)
+        crashes = []
+        queue = []
+        other = []
+
+        for file_path in sorted(files):
+            file_str = str(file_path)
+            if "/crashes/" in file_str:
+                crashes.append(file_str)
+            elif "/queue/" in file_str:
+                queue.append(file_str)
+            else:
+                other.append(file_str)
+
+        total_files = len(files)
+
+        if crashes:
+            print(f"\n🚨 CRASHES ({len(crashes)} files):")
+            for crash_file in crashes:
+                if verbose:
+                    print(f"  • {crash_file}")
+                else:
+                    # Extract just the filename for better readability
+                    filename = crash_file.split("/")[-1]
+                    print(f"  • {filename}")
+
+        if queue:
+            print(f"\n📁 QUEUE FILES ({len(queue)} files):")
+            for queue_file in queue:
+                if verbose:
+                    print(f"  • {queue_file}")
+                else:
+                    # Extract just the filename for better readability
+                    filename = queue_file.split("/")[-1]
+                    print(f"  • {filename}")
+
+        if other:
+            print(f"\n📄 OTHER FILES ({len(other)} files):")
+            for other_file in other:
+                if verbose:
+                    print(f"  • {other_file}")
+                else:
+                    # Extract just the filename for better readability
+                    filename = other_file.split("/")[-1]
+                    print(f"  • {filename}")
+
+        print(f"\n📊 SUMMARY:")
+        print(f"  Total files: {total_files}")
+        if crashes:
+            print(f"  Crashes: {len(crashes)} ({len(crashes)/total_files*100:.1f}%)")
+        if queue:
+            print(f"  Queue files: {len(queue)} ({len(queue)/total_files*100:.1f}%)")
+        if other:
+            print(f"  Other files: {len(other)} ({len(other)/total_files*100:.1f}%)")
+
+        # Show tip about verbose mode if not already in verbose mode
+        if not verbose:
+            print(f"\n💡 TIP: Use --verbose flag to see full file paths")
+
     else:
         raise NotImplementedError
 
@@ -377,23 +444,28 @@ def print_coverage_stats(mode="bbcov"):
     else:
         raise NotImplementedError
 
-def get_file_name(function : str):
+
+def get_file_name(function: str):
     for f, func in BBCovCoverageStats.COV_MAP.items():
         if f.name == function:
             return f.file_name
     return None
+
 
 def print_coverage_summary(mode="bbcov", function="main"):
     if mode == "tracepc":
         raise NotImplementedError
     elif mode == "bbcov":
         if function == "main":
-            log.warning("SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix")
+            log.warning(
+                "SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix"
+            )
             function = "old_main_grill"
-        BBCovCoverageStats.print_summary(function)        
+        BBCovCoverageStats.print_summary(function)
         return get_file_name(function)
     else:
         raise NotImplementedError
+
 
 def dump_coverage_info(mode="bbcov", output_file=""):
     if mode == "tracepc":
@@ -404,18 +476,23 @@ def dump_coverage_info(mode="bbcov", output_file=""):
     else:
         raise NotImplementedError
 
+
 def highlight_lines(function: str, sources: str, mode="bbcov", output_file=""):
     covered, uncovered, intersection = None, None, None
     if mode == "tracepc":
         if function == "main":
-            log.warning("SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix")
+            log.warning(
+                "SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix"
+            )
             function = "old_main_grill"
         covered, uncovered, intersection = TracePCCoverageStats.get_lines_covered(
             function
         )
     else:
         if function == "main":
-            log.warning("SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix")
+            log.warning(
+                "SWITCHING MAIN to old_main_grill - for GRILLER !!!! IF NOT GRILLER pls fix"
+            )
             function = "old_main_grill"
         covered, uncovered, intersection = BBCovCoverageStats.get_lines_covered(
             function
@@ -427,7 +504,7 @@ def highlight_lines(function: str, sources: str, mode="bbcov", output_file=""):
 
     if sources == None:
         print("NO SOURCES")
-        return 
+        return
 
     for line in sources:
         if line.line in covered:
@@ -438,6 +515,7 @@ def highlight_lines(function: str, sources: str, mode="bbcov", output_file=""):
             fp.write(f"\033[93m{line.source}\033[0m")
         else:
             fp.write(line.source)
+
 
 def load_dumped_json_cov_map(json_file):
     """
@@ -458,5 +536,15 @@ def load_dumped_json_cov_map(json_file):
                     for line_obj in bb["CovInfo"]
                 ]
                 covidx = bb.get("CovIndex", 0)
-                bb_objs.append(CoverageDetails(covidx, id, linemap, []))
+
+                # Require InputFiles field for new format
+                if "InputFiles" not in bb:
+                    raise ValueError(
+                        f"Coverage file {json_file} is missing 'InputFiles' field. "
+                        f"This file appears to be in an older format that doesn't include "
+                        f"input-to-basic-block mappings. Please regenerate the coverage file."
+                    )
+
+                input_files = bb["InputFiles"]
+                bb_objs.append(CoverageDetails(covidx, id, linemap, input_files))
             BBCovCoverageStats.COV_MAP[fkey] = bb_objs

@@ -1,20 +1,19 @@
-import argparse
-import os
+import json
 import pathlib
-import uuid
 
-from bccov.utils.pylogger import get_logger, set_global_log_level
-from bccov.main import tracepc, bbcov
 from bccov.config import set_config, set_cwd
 from bccov.llvm import build_passes
+from bccov.main import bbcov, tracepc
 from bccov.runtime import build_runtime
+from bccov.utils.pylogger import get_logger, set_global_log_level
 
 log = get_logger(__name__)
+
 
 class Args(object):
     TRACEPC = 1
     BBCOV = 2
-    
+
     def __init__(self, bitcode, input_dir, crashes_dir, source_dir, cflags):
         self.bitcode_file = pathlib.Path(bitcode)
         self.input_dir = pathlib.Path(input_dir)
@@ -30,23 +29,30 @@ class Args(object):
         self.reuse_cache = False
         self.interactive = False
 
-        assert self.bitcode_file.exists() and self.bitcode_file.is_file(), f"Bitcode file {self.bitcode_file} does not exist"
-        assert self.input_dir.exists() and self.input_dir.is_dir(), f"Input directory {self.input_dir} does not exist"
-        assert self.source_dir.exists() and self.source_dir.is_dir(), f"Source directory {self.source_dir} does not exist"
-        
+        assert (
+            self.bitcode_file.exists() and self.bitcode_file.is_file()
+        ), f"Bitcode file {self.bitcode_file} does not exist"
+        assert (
+            self.input_dir.exists() and self.input_dir.is_dir()
+        ), f"Input directory {self.input_dir} does not exist"
+        assert (
+            self.source_dir.exists() and self.source_dir.is_dir()
+        ), f"Source directory {self.source_dir} does not exist"
+
         ## defautls
         self.ccm = False
         self.afl = False
         self.output_file = None
         self.print_stats = False
-        self.line = None
+        self.line = 0
+        self.verbose = False
 
     def set_function(self, function):
         self.function = function
-        
+
     def set_cwd(self, cwd):
         self.cwd = cwd
-        
+
     def set_mode(self, mode):
         if mode == Args.TRACEPC:
             self.tracepc = True
@@ -55,18 +61,42 @@ class Args(object):
             self.tracepc = False
             self.bbcov = True
         else:
-            raise ValueError("Invalid mode")    
+            raise ValueError("Invalid mode")
 
-CWD=None
 
-def setup(cwd):
+CWD = None
+
+
+def setup(cwd, llvm_config=None):
     global CWD
-    set_config(pathlib.Path(__file__).parent.parent / "config.json")
+
+    # Generate config.json on demand if llvm_config is provided
+    if llvm_config:
+        config_path = pathlib.Path(cwd) / "config.json"
+        log.info(f"Generating config.json at {config_path}")
+
+        # Create the config dictionary
+        config_data = {
+            "LLVM_OPT": llvm_config.get("LLVM_OPT", "opt"),
+            "LLVM_LINK": llvm_config.get("LLVM_LINK", "llvm-link"),
+        }
+
+        # Write the config.json file
+        with open(config_path, "w") as f:
+            json.dump(config_data, f, indent=4)
+
+        # Set the config to use the generated file
+        set_config(config_path)
+    else:
+        # Use the default config file
+        set_config(pathlib.Path(__file__).parent.parent / "config.json")
+
     set_global_log_level("INFO")
     set_cwd(cwd)
-    CWD=cwd
+    CWD = cwd
     build_passes()
     build_runtime()
+
 
 def run_tracepc_cov(bitcode_file, dirs, source_dir, target_function, cflags):
     args = Args(bitcode_file, dirs[0], dirs[1], source_dir, cflags)
@@ -74,8 +104,11 @@ def run_tracepc_cov(bitcode_file, dirs, source_dir, target_function, cflags):
     args.set_cwd(CWD)
     args.set_mode(Args.TRACEPC)
     tracepc(args)
-    
-def run_bbcov_cov(bitcode_file, dirs, source_dir, target_function, cflags, output_file, afl_mode=True):
+
+
+def run_bbcov_cov(
+    bitcode_file, dirs, source_dir, target_function, cflags, output_file, afl_mode=True
+):
     args = Args(bitcode_file, dirs[0], dirs[1], source_dir, cflags)
     args.set_function(target_function)
     args.set_cwd(CWD)
@@ -84,15 +117,24 @@ def run_bbcov_cov(bitcode_file, dirs, source_dir, target_function, cflags, outpu
     args.output_file = output_file
     bbcov(args)
 
-def run_highlight_from_dumped_covinfo(covinfo_file, source_dir, target_function, output_file=None):
-    from bccov.coverage import load_dumped_json_cov_map, print_coverage_summary, get_function_source, highlight_lines
+
+def run_highlight_from_dumped_covinfo(
+    covinfo_file, source_dir, target_function, output_file=None
+):
+    from bccov.coverage import (
+        get_function_source,
+        highlight_lines,
+        load_dumped_json_cov_map,
+        print_coverage_summary,
+    )
     from bccov.indexer import create_code_database, get_function_source
+
     load_dumped_json_cov_map(covinfo_file)
     create_code_database(source_dir)
     file_name = print_coverage_summary("bbcov", target_function)
     sources = get_function_source(
-        target_function,
-        file_name,
-        output_mode=True if output_file else False
+        target_function, file_name, output_mode=True if output_file else False
     )
-    highlight_lines(target_function, sources, mode="bbcov", output_file=output_file or "")
+    highlight_lines(
+        target_function, sources, mode="bbcov", output_file=output_file or ""
+    )

@@ -1,12 +1,11 @@
-import pathlib
-from typing import List
-from collections import namedtuple
 import os
+import pathlib
+from collections import namedtuple
+from typing import List
 
 import clang.cindex
-from clang.cindex import Config
-
 from bccov.utils import get_logger
+from clang.cindex import Config
 
 logger = get_logger(__name__, "INFO")
 
@@ -15,13 +14,13 @@ sources = namedtuple("sources", ["source", "line", "file_path"])
 
 class CodebaseAnalyzer:
     def __init__(self, codebase_path):
-        if pathlib.Path('/home/r3x/llvm10/llvm-10.0.0.obj/lib').exists():
-            Config.set_library_path('/home/r3x/llvm10/llvm-10.0.0.obj/lib')
-        elif pathlib.Path('/usr/lib/llvm-10/lib').exists():
-            Config.set_library_file('/usr/lib/llvm-10/lib/libclang.so.1')
+        if pathlib.Path("/home/r3x/llvm10/llvm-10.0.0.obj/lib").exists():
+            Config.set_library_path("/home/r3x/llvm10/llvm-10.0.0.obj/lib")
+        elif pathlib.Path("/usr/lib/llvm-10/lib").exists():
+            Config.set_library_file("/usr/lib/llvm-10/lib/libclang.so.1")
         else:
             raise Exception("Could not find the clang library path")
-        
+
         self.index = clang.cindex.Index.create()
         self.cache = {}  # Cache to store indexes and extracted data for each file
         self.codebase_path = codebase_path
@@ -76,7 +75,9 @@ class CodebaseAnalyzer:
         else:
             return None
 
-    def get_function_source(self, function_name, file_name, output_mode = True) -> List[sources]:
+    def get_function_source(
+        self, function_name, file_name, output_mode=True
+    ) -> List[sources]:
         """
         :param function_name: Name of the function to find source of
 
@@ -86,7 +87,7 @@ class CodebaseAnalyzer:
         functions = []
         for file_path, data in self.cache.items():
             node = data["functions"].get(function_name)
-            
+
             if file_name:
                 if file_name == pathlib.Path(file_path).name:
                     if node and node.is_definition():
@@ -94,23 +95,25 @@ class CodebaseAnalyzer:
             else:
                 if node and node.is_definition():
                     functions.append((file_path, node))
-       
+
         if len(functions) == 0:
             print(f"Could not find function with the name {function_name}")
-            return None 
-        
+            return None
+
         node = None
         node = functions[0][1]
         file_path = functions[0][0]
         if len(functions) > 1:
-            print(f"Found multiple functions with the name {function_name}. Please choose one:")
+            print(
+                f"Found multiple functions with the name {function_name}. Please choose one:"
+            )
             if output_mode:
                 for i, (file_path, node) in enumerate(functions):
                     print(f"{i + 1}. {file_path}")
                 choice = int(input("Enter your choice: "))
-                node = functions[choice - 1][1] 
+                node = functions[choice - 1][1]
                 file_path = functions[choice - 1][0]
-                    
+
         start_line, end_line = node.extent.start.line, node.extent.end.line
         with open(file_path, "rb") as file:
             lines = file.readlines()
@@ -133,7 +136,7 @@ def create_code_database(path):
         DB = CodebaseAnalyzer(path)
 
 
-def get_function_source(function_name: str, file_name = None, output_mode = True):
+def get_function_source(function_name: str, file_name=None, output_mode=True):
     """
     Get the source code for a given function name
 

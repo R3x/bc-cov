@@ -34,7 +34,6 @@ def link_runtime(
 def run_and_collect_coverage(
     input_binary: pathlib.Path, output_file: pathlib.Path, input_file: pathlib.Path
 ):
-
     assert all(
         p.exists() and p.is_file() for p in [input_binary, input_file]
     ), f"Input files do not exist"

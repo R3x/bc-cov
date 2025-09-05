@@ -9,6 +9,7 @@ LIB_DIR = None
 
 CWD = None
 
+
 def get_function_file_path():
     # Return the absolute path of the file containing this function
     return pathlib.Path(__file__)
