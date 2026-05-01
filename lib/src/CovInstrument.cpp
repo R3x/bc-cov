@@ -245,7 +245,7 @@ namespace
         BBs.push_back(&BB);
         // Create an atomic increment for the corresponding counter
         std::vector<Value *> Indices{ConstantInt::get(Type::getInt64Ty(C), 0), ConstantInt::get(Type::getInt64Ty(C), BBIndex++)};
-        Value *Ptr = Builder.CreateInBoundsGEP(BBCounters, Indices);
+        Value *Ptr = Builder.CreateInBoundsGEP(BBCounters->getValueType(), BBCounters, Indices);
         LoadInst *LoadedVal = Builder.CreateAlignedLoad(Type::getInt64Ty(C), Ptr, llvm::MaybeAlign(8));
         LoadedVal->setAtomic(AtomicOrdering::Monotonic);
         Value *IncVal = Builder.CreateAdd(LoadedVal, ConstantInt::get(Type::getInt64Ty(C), 1));
