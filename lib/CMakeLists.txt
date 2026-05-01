@@ -4,9 +4,7 @@ if(POLICY CMP0074)
     cmake_policy(SET CMP0074 OLD)
 endif()
 
-set(ENV{LLVM_DIR} /home/r3x/llvm10/llvm-10.0.0.obj/)
-set(ENV{LLVM_SRC} /home/r3x/llvm10/llvm-10.0.0.src/)
-set(ENV{LLVM_OBJ} /home/r3x/llvm10/llvm-10.0.0.obj/)
+set(ENV{LLVM_DIR} /usr/lib/llvm-16/lib/cmake/llvm/)
 # To support both in- and out-of-source builds,
 # we check for the presence of the add_llvm_loadable_module command.
 # - if this command is not present, we are building out-of-source
@@ -14,12 +12,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if(NOT COMMAND add_llvm_loadable_module)
     if (DEFINED ENV{LLVM_DIR})
         # We need to match the build environment for LLVM:
-        # In particular, we need C++11 and the -fno-rtti flag
-        set(CMAKE_CXX_STANDARD 14)
+        # In particular, we need C++17 and the -fno-rtti flag
+        set(CMAKE_CXX_STANDARD 17)
 	if(CMAKE_BUILD_TYPE MATCHES "Debug")
-		set(CMAKE_CXX_FLAGS "-std=c++14 -D__GLIBCXX_USE_CXX11_ABI=0 -O0 -fno-rtti")
+		set(CMAKE_CXX_FLAGS "-std=c++17 -D__GLIBCXX_USE_CXX11_ABI=0 -O0 -fno-rtti")
 	else()
-		set(CMAKE_CXX_FLAGS "-std=c++14 -D__GLIBCXX_USE_CXX11_ABI=0 -O3 -fno-rtti")
+		set(CMAKE_CXX_FLAGS "-std=c++17 -D__GLIBCXX_USE_CXX11_ABI=0 -O3 -fno-rtti")
 	endif()
 
 	find_package(LLVM REQUIRED CONFIG)

@@ -246,10 +246,10 @@ namespace
         // Create an atomic increment for the corresponding counter
         std::vector<Value *> Indices{ConstantInt::get(Type::getInt64Ty(C), 0), ConstantInt::get(Type::getInt64Ty(C), BBIndex++)};
         Value *Ptr = Builder.CreateInBoundsGEP(BBCounters, Indices);
-        LoadInst *LoadedVal = Builder.CreateAlignedLoad(Type::getInt64Ty(C), Ptr, 8);
+        LoadInst *LoadedVal = Builder.CreateAlignedLoad(Type::getInt64Ty(C), Ptr, llvm::MaybeAlign(8));
         LoadedVal->setAtomic(AtomicOrdering::Monotonic);
         Value *IncVal = Builder.CreateAdd(LoadedVal, ConstantInt::get(Type::getInt64Ty(C), 1));
-        StoreInst *Store = Builder.CreateAlignedStore(IncVal, Ptr, 8);
+        StoreInst *Store = Builder.CreateAlignedStore(IncVal, Ptr, llvm::MaybeAlign(8));
         Store->setAtomic(AtomicOrdering::Monotonic);
       }
       this->fileBBMap[&F] = BBs;
