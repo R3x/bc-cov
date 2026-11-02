@@ -40,4 +40,7 @@ def run_and_collect_coverage(
     ), f"Input binary does not exist"
     assert input_file.exists() and input_file.is_file(), f"Input file does not exist"
 
-    run_cmd(f"BC_COV_FILE={output_file} {input_binary} < {input_file}")
+    run_cmd(
+        f"BC_COV_FILE={output_file} {input_binary} < {input_file}",
+        cwd=config.EXEC_CWD,
+    )

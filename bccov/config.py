@@ -9,6 +9,8 @@ LIB_DIR = None
 
 CWD = None
 
+# cwd for executing the instrumented binary (None = inherit the caller's cwd).
+EXEC_CWD = None
 
 def get_function_file_path():
     # Return the absolute path of the file containing this function
@@ -46,3 +48,10 @@ def set_cwd(cwd: pathlib.Path):
     global CWD
     print(f"Setting CWD to {cwd}")
     CWD = cwd
+
+
+def set_exec_cwd(cwd):
+    """Directory the instrumented binary runs in when collecting coverage; the
+    target may create files relative to it."""
+    global EXEC_CWD
+    EXEC_CWD = pathlib.Path(cwd) if cwd else None

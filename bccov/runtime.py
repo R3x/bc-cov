@@ -38,4 +38,7 @@ def run_and_collect_coverage(
         p.exists() and p.is_file() for p in [input_binary, input_file]
     ), f"Input files do not exist"
 
-    run_cmd(f"BC_COV_FILE={output_file} {input_binary} < {input_file}")
+    run_cmd(
+        f"BC_COV_FILE={output_file} {input_binary} < {input_file}",
+        cwd=config.EXEC_CWD,
+    )

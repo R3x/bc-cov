@@ -1,7 +1,7 @@
 import json
 import pathlib
 
-from bccov.config import set_config, set_cwd
+from bccov.config import set_config, set_cwd, set_exec_cwd
 from bccov.llvm import build_passes
 from bccov.main import bbcov, tracepc
 from bccov.runtime import build_runtime
@@ -67,8 +67,11 @@ class Args(object):
 CWD = None
 
 
-def setup(cwd, llvm_config=None):
+def setup(cwd, llvm_config=None, exec_cwd=None):
+    """``cwd``: where bccov builds its instrumented binaries. ``exec_cwd``:
+    where those binaries are *run* (defaults to the caller's cwd)."""
     global CWD
+    set_exec_cwd(exec_cwd)
 
     # Generate config.json on demand if llvm_config is provided
     if llvm_config:
