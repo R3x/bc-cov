@@ -3,14 +3,15 @@ import pathlib
 
 LLVM_OPT = "opt"
 LLVM_LINK = "llvm-link"
+AFL_CLANG = "afl-clang-fast"
 
 RUNTIME_DIR = None
 LIB_DIR = None
 
 CWD = None
-
 # cwd for executing the instrumented binary (None = inherit the caller's cwd).
 EXEC_CWD = None
+
 
 def get_function_file_path():
     # Return the absolute path of the file containing this function
@@ -28,7 +29,7 @@ def set_local_paths():
 
 
 def set_config(path_to_config: pathlib.Path):
-    global LLVM_OPT, LLVM_LINK
+    global LLVM_OPT, LLVM_LINK, AFL_CLANG
 
     set_local_paths()
 
@@ -38,6 +39,7 @@ def set_config(path_to_config: pathlib.Path):
                 config = json.load(f)
                 LLVM_OPT = config.get("LLVM_OPT", LLVM_OPT)
                 LLVM_LINK = config.get("LLVM_LINK", LLVM_LINK)
+                AFL_CLANG = config.get("AFL_CLANG", AFL_CLANG)
         except json.decoder.JSONDecodeError as e:
             raise Exception(
                 f"Config file {path_to_config} is not a valid JSON file"

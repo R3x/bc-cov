@@ -16,4 +16,13 @@ cmake ..
 echo "[*] Trying to make"
 make -j$(nproc)
 
+# Build the coverage runtime bitcode (bbcov_runtime.bc, tracepc_runtime.bc, ...).
+# bccov's link_runtime fails silently if these are missing, so build them here.
+# Honor "clean" by rebuilding from scratch.
+echo "[*] Building coverage runtime bitcode"
+if [ "$1" == "clean" ]; then
+    make -C "$DIR/../runtime" clean
+fi
+make -C "$DIR/../runtime" all
+
 # Copy all the passes to the build directory

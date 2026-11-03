@@ -3,6 +3,7 @@ import os
 import pathlib
 import uuid
 
+from bccov import config
 from bccov.compile import build_binary
 from bccov.config import TESTS_DIR, set_config
 from bccov.coverage import (
@@ -376,7 +377,7 @@ def bbcov(args: argparse.Namespace):
         f"{CWD}/final_linked-{id}.bc",
         f"{CWD}/final_binary-{id}",
         cflags=args.cflags,
-        compiler="/home/r3x/random/AFLplusplus/afl-clang-fast",
+        compiler=config.AFL_CLANG,
         env_vars="AFL_USE_ASAN=1",
     )
     log.info("Parsing coverage info")

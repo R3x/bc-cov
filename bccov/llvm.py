@@ -22,8 +22,12 @@ def run_passes(
     skip_flag = ""
     if skip_file.exists():
         skip_flag = f"--skiplist {skip_file}"
+    # LLVM-16's opt defaults to the new pass manager and rejects the legacy
+    # `-load <plugin> -cov-instrument` syntax. Load the plugin and select the
+    # pass via the new-PM interface instead. The cl::opt flags below (-output,
+    # --skiplist, -bbcount/-tracepc) are still parsed from opt's command line.
     run_cmd(
-        f"{config.LLVM_OPT} -f -load {PASS_MAP[pass_name]} -output {output_cov_info_file} {flags} {skip_flag} -cov-instrument --disable-verify < {bitcode_file} > {output_bitcode_file}",
+        f"{config.LLVM_OPT} -f -load-pass-plugin {PASS_MAP[pass_name]} -passes=cov-instrument -output {output_cov_info_file} {flags} {skip_flag} --disable-verify < {bitcode_file} > {output_bitcode_file}",
         verbose=True,
     )
     output_bitcode_file = pathlib.Path(output_bitcode_file)

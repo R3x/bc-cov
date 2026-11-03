@@ -21,14 +21,24 @@ def link_runtime(
         p.exists() and p.is_file() for p in [input_bitcode]
     ), f"Input files do not exist"
 
-    if debug:
-        run_cmd(
-            f"{config.LLVM_LINK} {input_bitcode} {config.RUNTIME_DIR}/debug{BITCODE[mode]} -o {output_bitcode}",
-        )
-    else:
-        run_cmd(
-            f"{config.LLVM_LINK} {input_bitcode} {config.RUNTIME_DIR}/{BITCODE[mode]} -o {output_bitcode}",
-        )
+    runtime_name = f"debug{BITCODE[mode]}" if debug else BITCODE[mode]
+    runtime_bc = pathlib.Path(config.RUNTIME_DIR) / runtime_name
+    # The runtime bitcode is built by `make -C utils/bc-cov/runtime all`
+    # (also wired into lib/build.sh). If it's missing, llvm-link fails silently
+    # and the absent output only surfaces later as a cryptic clang error on
+    # final_binary — so fail loudly and actionably here instead.
+    assert runtime_bc.exists() and runtime_bc.is_file(), (
+        f"Coverage runtime bitcode missing: {runtime_bc}. "
+        f"Build it with `make -C {config.RUNTIME_DIR} all` (LLVM-16 clang)."
+    )
+
+    run_cmd(
+        f"{config.LLVM_LINK} {input_bitcode} {runtime_bc} -o {output_bitcode}",
+    )
+    assert output_bitcode.exists() and output_bitcode.is_file(), (
+        f"llvm-link did not produce {output_bitcode} "
+        f"(linked {input_bitcode} + {runtime_bc}); check {config.LLVM_LINK}."
+    )
 
 
 def run_and_collect_coverage(

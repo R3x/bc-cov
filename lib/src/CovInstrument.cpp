@@ -5,9 +5,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Pass.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/AtomicOrdering.h"
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/IR/DebugInfoMetadata.h>
+#include <llvm/IR/PassManager.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/CommandLine.h>
 
@@ -407,3 +410,55 @@ namespace
 
 char CovInstrument::ID = 0;
 static RegisterPass<CovInstrument> X("cov-instrument", "Thread-Safe Coverage Instrumentation Pass", false, false);
+
+// ---------------------------------------------------------------------------
+// New PassManager (LLVM >= 13) interface.
+//
+// LLVM-16's `opt` defaults to the new PassManager and rejects the legacy
+// `-load <plugin> -cov-instrument` syntax. Expose the same instrumentation as a
+// new-PM module pass so it can be run with:
+//   opt -load-pass-plugin=libCovInstrument.so -passes=cov-instrument ...
+// The cl::opt options above (-output, -skiplist, -bbcount, -tracepc) are still
+// parsed from opt's command line because the plugin's static initializers run
+// when the shared object is loaded.
+// ---------------------------------------------------------------------------
+namespace
+{
+  struct CovInstrumentNewPM : public PassInfoMixin<CovInstrumentNewPM>
+  {
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &)
+    {
+      // The legacy pass body does not use the legacy analysis infrastructure
+      // (no getAnalysis calls), so we can drive it directly here.
+      CovInstrument Impl;
+      bool Changed = Impl.runOnModule(M);
+      return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+    }
+
+    // Ensure the pass runs even though it is not in a default pipeline.
+    static bool isRequired() { return true; }
+  };
+} // namespace
+
+llvm::PassPluginLibraryInfo getCovInstrumentPluginInfo()
+{
+  return {LLVM_PLUGIN_API_VERSION, "CovInstrument", LLVM_VERSION_STRING,
+          [](PassBuilder &PB) {
+            PB.registerPipelineParsingCallback(
+                [](StringRef Name, ModulePassManager &MPM,
+                   ArrayRef<PassBuilder::PipelineElement>) {
+                  if (Name == "cov-instrument")
+                  {
+                    MPM.addPass(CovInstrumentNewPM());
+                    return true;
+                  }
+                  return false;
+                });
+          }};
+}
+
+extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
+llvmGetPassPluginInfo()
+{
+  return getCovInstrumentPluginInfo();
+}

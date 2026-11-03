@@ -11,8 +11,11 @@ def build_binary(
     cflags: str = "",
     env_vars: str = "",
 ):
-    run_cmd(
-        f"{env_vars} {compiler} {cflags} -g {bitcode_file} -o {output_file}",
-        verbose=True,
+    cmd = f"{env_vars} {compiler} {cflags} -g {bitcode_file} -o {output_file}"
+    stdout, stderr = run_cmd(cmd, verbose=True) or ("", "")
+    assert os.path.exists(output_file), (
+        f"Failed to create output file {output_file}\n"
+        f"  command: {cmd}\n"
+        f"  stdout: {stdout}\n"
+        f"  stderr: {stderr}"
     )
-    assert os.path.exists(output_file), f"Failed to create output file {output_file}"

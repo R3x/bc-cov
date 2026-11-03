@@ -82,6 +82,7 @@ def setup(cwd, llvm_config=None, exec_cwd=None):
         config_data = {
             "LLVM_OPT": llvm_config.get("LLVM_OPT", "opt"),
             "LLVM_LINK": llvm_config.get("LLVM_LINK", "llvm-link"),
+            "AFL_CLANG": llvm_config.get("AFL_CLANG", "afl-clang-fast"),
         }
 
         # Write the config.json file

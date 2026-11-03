@@ -4,6 +4,7 @@ from collections import namedtuple
 from typing import List
 
 import clang.cindex
+from bccov import config as bccov_config
 from bccov.utils import get_logger
 from clang.cindex import Config
 
@@ -11,15 +12,60 @@ logger = get_logger(__name__, "INFO")
 
 sources = namedtuple("sources", ["source", "line", "file_path"])
 
+_LIBCLANG_CONFIGURED = False
+
+
+def _configure_libclang():
+    """Point clang.cindex at a libclang shared library.
+
+    Historically this hardcoded LLVM-10 dev paths (`/home/r3x/...`,
+    `/usr/lib/llvm-10/...`), which don't exist on an LLVM-16 toolchain. Derive
+    the library from the configured `opt` binary (so it tracks LLVM_ROOT), with
+    an env override and common fallbacks. Safe to call more than once.
+    """
+    global _LIBCLANG_CONFIGURED
+    if _LIBCLANG_CONFIGURED:
+        return
+
+    file_candidates = []
+    # 1. Explicit override.
+    env_file = os.environ.get("LIBCLANG_LIBRARY_FILE")
+    if env_file:
+        file_candidates.append(env_file)
+    # 2. Derived from the configured `opt` binary: <llvm_root>/lib/libclang.so*.
+    opt = getattr(bccov_config, "LLVM_OPT", None)
+    if opt and os.path.isabs(opt):
+        llvm_lib = pathlib.Path(opt).resolve().parent.parent / "lib"
+        file_candidates += [str(llvm_lib / "libclang.so.1"), str(llvm_lib / "libclang.so")]
+    # 3. Common / legacy fallbacks.
+    file_candidates += [
+        "/usr/lib/llvm-16/lib/libclang.so.1",
+        "/usr/lib/x86_64-linux-gnu/libclang-16.so.1",
+        "/usr/lib/llvm-10/lib/libclang.so.1",
+    ]
+    for f in file_candidates:
+        if f and pathlib.Path(f).is_file():
+            Config.set_library_file(f)
+            _LIBCLANG_CONFIGURED = True
+            logger.info(f"Using libclang: {f}")
+            return
+    # 4. Directory-based legacy fallback.
+    for d in ("/home/ubuntu/griller_workspace/tools/llvm-10/lib",
+              "/home/r3x/llvm10/llvm-10.0.0.obj/lib"):
+        if pathlib.Path(d).is_dir():
+            Config.set_library_path(d)
+            _LIBCLANG_CONFIGURED = True
+            logger.info(f"Using libclang dir: {d}")
+            return
+    raise Exception(
+        "Could not find libclang. Set LIBCLANG_LIBRARY_FILE, or install the "
+        "LLVM toolchain libclang (e.g. /usr/lib/llvm-16/lib/libclang.so.1)."
+    )
+
 
 class CodebaseAnalyzer:
     def __init__(self, codebase_path):
-        if pathlib.Path("/home/r3x/llvm10/llvm-10.0.0.obj/lib").exists():
-            Config.set_library_path("/home/r3x/llvm10/llvm-10.0.0.obj/lib")
-        elif pathlib.Path("/usr/lib/llvm-10/lib").exists():
-            Config.set_library_file("/usr/lib/llvm-10/lib/libclang.so.1")
-        else:
-            raise Exception("Could not find the clang library path")
+        _configure_libclang()
 
         self.index = clang.cindex.Index.create()
         self.cache = {}  # Cache to store indexes and extracted data for each file
